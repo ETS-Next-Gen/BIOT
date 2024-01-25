@@ -1,5 +1,5 @@
-##############
-#### BIOT ####
+###############
+### BIOT ####
 ##############
 
 rm(list = ls())
@@ -18,8 +18,16 @@ args <- commandArgs(TRUE)
 source.files <- list.files(path = function.path, recursive = TRUE)
 invisible(sapply(source.files, function(x) source(file = paste0(function.path, x))))
 
-# lambda.vals <- seq(0.0001, 3.5, length = 10) # non-log scale
-lambda.vals <- exp(seq(log(0.0001), log(3.5), length.out = 10)) # log scale
+nlambdas = 10
+nfolds = 10 
+maxLambda = 3.5 
+sigThresh = .05
+
+if (length(args) >= 4) {
+  nlambdas = as.numeric(args[4])
+}
+# lambda.vals <- seq(0.0001, 1, length = nlambdas) # non-log scale
+lambda.vals <- exp(seq(log(0.0001), log(maxLambda), length.out = nlambdas)) # log scale
 
 if (length(args) == 0) {
   # Default files for Fe and X
@@ -33,16 +41,16 @@ if (length(args) == 0) {
   Fe <- read.csv(args[2])
   if (length(args) >= 3) {
     out.path <- args[3]
-    if (length(args) >= 4) {
-      lambda.vals <- exp(seq(log(as.numeric(args[4])), log(3.5), length = 10))
-      if (length(args) >= 5) {
-        lambda.vals <- exp(seq(log(as.numeric(args[4])), log(as.numeric(args[5])), length = 10))
+    if (length(args) >= 5) {
+        lambda.vals <- exp(seq(log(as.numeric(args[5])), log(maxLambda), length = nlambdas))
         if (length(args) >= 6) {
-          lambda.vals <- exp(seq(log(as.numeric(args[4])), log(as.numeric(args[5])), length = as.numeric(args[6])))
-        } else {
-          stop("You provided too many inputs.")
+          lambda.vals <- exp(seq(log(as.numeric(args[5])), log(as.numeric(args[6])), length = nlambdas))
+          if (length(args) >= 7) {
+            lambda.vals <- exp(seq(log(as.numeric(args[5])), log(as.numeric(args[6])), length = as.numeric(args[7])))
+          } else {
+            stop("You provided too many inputs.")
+          }
         }
-      }
     }
   }
 }
@@ -56,44 +64,44 @@ print("Selection of lambda in progress...")
 # Prepare fold ids
 seed <- 155000
 set.seed(seed)
-
 # Eval results for each lambda in lambda.vals stored in df eval.res.lambda
-eval.res.lambda <- do.call(rbind, 
+ eval.res.lambda <- do.call(rbind, 
                            lapply(1:length(lambda.vals), function(lambda.vals.index) {
                              
   lambda <- lambda.vals[lambda.vals.index]
-  
+  print(paste('Processing lambda index ', lambda.vals.index))
   # Split data row indexes randomly into K folds
-  K <- 10 # number of folds for K-fold cross-validation
+  K <- nfolds # number of folds for K-fold cross-validation
   fold.ids <- suppressWarnings(split(sample(nrow(Fe)), seq(1, nrow(Fe), length = K)))
   
   eval.res.K <- c()
   for (index.fold in 1:K){
+    print(paste('    Processing fold index ', index.fold))
     # Process fold data
     fold.data <- ProcessFoldData(X = X, Fe = Fe, test.id = fold.ids[[index.fold]])
     
     # normalize lambda
     lambda.norm <- lambda/sqrt(ncol(fold.data$Fe.norm))
-    
     # Get rotation matrix and weights
     res <- RunBIOT(X = fold.data$X.norm, 
                    Fe = fold.data$Fe.norm,
-                   lambda = lambda.norm)
+                   lambda = lambda.norm, rotation=T)
     R <- res$R
     W <- res$W
-    
+    print(res$R_squared)
+    #print(res$W)
+
     # Eval
     tmp <- Eval(R = R, 
                 W = W, 
                 Fe.test = fold.data$Fe.test,
                 X.test = fold.data$X.test)
     
-    if (!is.na(tmp$MSE)) eval.res.K[[index.fold]] <- cbind.data.frame(lambda = lambda,
-                                                                      lambda.norm = lambda.norm,
-                                                                      tmp)
+    if (!is.na(tmp$MSE)) eval.res.K[[index.fold]] <- cbind.data.frame(lambda = lambda,lambda.norm = lambda.norm,tmp)
   }
   return(do.call(rbind.data.frame, eval.res.K))
 }))
+
 
 ####################################
 #### Now choose the best lambda ####
@@ -102,7 +110,7 @@ eval.res.lambda <- do.call(rbind,
 # Consider the lambda with the min avg_MSE
 # lambda.avg.MSE: average test MSE for each lambda value in lambda.val
 lambda.avg.MSE <- sapply(1:length(lambda.vals), function(lambda.val) 
-  mean(eval.res.lambda[, "MSE"][which(eval.res.lambda[, "lambda"] == lambda.vals[lambda.val])], na.rm = T))
+   mean(eval.res.lambda[, "MSE"][which(eval.res.lambda[, "lambda"] == lambda.vals[lambda.val])], na.rm = T))
 which.lambda.min.MSE <- which.min(lambda.avg.MSE)
 
 print(rbind(lambda.vals, lambda.avg.MSE))
@@ -112,8 +120,12 @@ print(paste0("The lambda with the min avg MSE is ", lambda.vals[which.lambda.min
 results <- eval.res.lambda
 lambda.index <- which.lambda.min.MSE
 not.finished <- T
-test.index <- lambda.index + 1
-while(not.finished){
+if (which.lambda.min.MSE == nlambdas) {
+    test.index <- lambda.index
+} else {
+    test.index <- lambda.index + 1
+}
+while(not.finished & test.index <= nlambdas){
   MSE1 <- results[which(results[, "lambda"] == lambda.vals[lambda.index]), 
                   "MSE"]
   MSE2 <- results[which(results[, "lambda"] == lambda.vals[test.index]),
@@ -126,11 +138,11 @@ while(not.finished){
                                          paired = T)$p.val
   }
   
-  if (pval <= 0.05){
+  if (pval <= sigThresh){
     best.lambda.index <- test.index - 1
     not.finished <- F
   }
-  if (pval > 0.05 & test.index == length(lambda.vals)){
+  if (pval > sigThresh & test.index == length(lambda.vals)){
     best.lambda.index <- test.index
     not.finished <- F
   }
@@ -150,13 +162,29 @@ if (length(wh.zero.sd) > 0){
   Fe.sd[wh.zero.sd] <- 1 # replace with 1 to avoid dividing by 0
 }
 
-# Compute BIOT on the full dataset with the best lambda
-res <- RunBIOT(X = scale(X, center=T, scale=F), 
+res <- RunBIOT(X = scale(X, center=T, scale=F),
                Fe = scale(Fe, center=T, scale=Fe.sd),
-               lambda = lambda.vals[best.lambda.index]/sqrt(ncol(Fe)))
+               lambda = lambda.vals[best.lambda.index]/sqrt(ncol(Fe)), rotation=T)
 
 # Put regression weights and Rsq in a list and save to .RData file
 W_R_squared <- list(W = res$W, R_squared = res$R_squared)
-save(W_R_squared, file = out.path)
-print(paste0("Final weights and Rsq stored in ", out.path, ". R object is called W_R_squared."))
+save(W_R_squared, file = paste(out.path, 'RData.csv'))
+write.csv(res$R_squared,file=paste(out.path, 'RSquared.csv'))
+print(paste0("Final weights and Rsq stored in ", paste(out.path, 'RData.csv'), ". R object is called W_R_squared."))
+show(W_R_squared)
 
+# Output the rotated matrix
+scaledX = scale(X, center=T, scale=F)
+write.csv(scaledX, file=paste(out.path, 'scaledX.csv'), row.names=FALSE)
+RMatrix = data.matrix(scaledX) %*% data.matrix(res$R)
+write.csv(RMatrix, file = paste(out.path, 'rMatrix.csv'), row.names=FALSE)
+write.csv(res$R, file=paste(out.path, 'rotation.csv'), row.names=FALSE)
+FeX = scale(Fe, center=T, scale=Fe.sd)
+write.csv(FeX, file=paste(out.path, 'features.csv'), row.names=FALSE)
+cors = cor(RMatrix, FeX)
+write.csv(cors, file = paste(out.path, 'cors.csv'), row.names=TRUE, col.names=TRUE)
+combined = cbind(RMatrix, FeX)
+write.csv(combined, file=paste(out.path, 'combined.csv'), row.names=TRUE)
+WMatrix = data.matrix(FeX) %*% data.matrix(res$W)
+write.csv(WMatrix, file=paste(out.path, 'pMatrix.csv'), row.names=FALSE)
+write.csv(res$W, file=paste(out.path, 'weights.csv'))
