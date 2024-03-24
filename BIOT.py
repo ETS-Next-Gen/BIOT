@@ -10,13 +10,6 @@ from PyFunctions.run_BIOT import RunBIOT
 from PyFunctions.get_W_Lasso import GetWLasso
 from PyFunctions.eval import Eval
 
-# TEST LASSO
-X = torch.tensor(np.genfromtxt("X_train_norm_py.csv", delimiter=',', dtype='float64'))
-Fe = torch.tensor(np.genfromtxt("Fe_train_norm_py.csv", delimiter=',', dtype='float64'))
-W, r2 = GetWLasso(X=Fe, Y=X, lam=0.0001)
-print(W.shape)
-quit()
-
 # DEFAULT FILE PATHS
 FunctionPath = "PyFunctions/"
 DatasetPath = "Datasets/dataset.csv"
