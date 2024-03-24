@@ -57,7 +57,6 @@ class Lasso_Regression():
     #     dw[i] = (-(2*(self.X[:,i].t()) @ (self.Y - Y_pred)) + self.lam) / self.m
     #   else :
     #     dw[i] = (-(2*(self.X[:,i].t()) @ (self.Y - Y_pred)) - self.lam) / self.m
-
     dw = ( -(2*(self.X.T @ (self.Y - Y_pred))) - self.lam) / self.m
     dw = torch.where( self.w > 0, dw + (2 * self.lam) / self.m, dw )
 
