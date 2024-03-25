@@ -73,18 +73,4 @@ def GetRSquared(X, Y, W):
   
   return 1 - (torch.sum((X @ W - Y)**2) / torch.sum((Y - torch.mean(Y))**2))
 
-import numpy as np
-import time
-# import cProfile as prof
 
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = "cpu"
-X = torch.tensor(np.genfromtxt("X_train_norm_py.csv", delimiter=',', dtype='float64')).to(device)
-Fe = torch.tensor(np.genfromtxt("Fe_train_norm_py.csv", delimiter=',', dtype='float64')).to(device)
-
-# prof.run('GetWLasso(X=Fe, Y=X, lam=0.0001)')
-start = time.time()
-W, r2 = GetWLasso(X=Fe, Y=X, lam=0.0001, device=device)
-print(time.time() - start)
-print(W.shape)
-print(W)
