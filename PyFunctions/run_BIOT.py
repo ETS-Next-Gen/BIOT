@@ -18,7 +18,6 @@ def RunBIOT(X, Fe, lam, maxIter = 2, eps = 1e-6, rotation = False):
   X = torch.tensor(X).to(device)
   Fe = torch.tensor(Fe).to(device)
   W, r2 = torch.tensor(GetWLasso(X=Fe, Y=X, lam=lam)).to(device)
-  # W = torch.ones((Fe.shape[1], X.shape[1]), dtype=torch.float64).to(device)
 
   diff = 1
   iter = 0
@@ -28,11 +27,6 @@ def RunBIOT(X, Fe, lam, maxIter = 2, eps = 1e-6, rotation = False):
   while( iter + 1 < maxIter and diff > eps ):  
     # Perform singular value decomposition
     u, d, v = torch.linalg.svd( (1 / (2 * Fe.shape[0])) * X.t() @ (Fe @ W))
-    np.savetxt('Py_u.csv', u.numpy(), delimiter=',')
-    np.savetxt('Py_d.csv', d.numpy(), delimiter=',')
-    np.savetxt('Py_v.csv', v.numpy(), delimiter=',')
-    # 383
-    print(torch.argmin(d))
 
     if rotation:
       # Set the smallest singular value to the sign of the determinant of U and V^T.
@@ -61,28 +55,3 @@ def RunBIOT(X, Fe, lam, maxIter = 2, eps = 1e-6, rotation = False):
 
   return ( R, W, iter, crit, r2 ) 
 
-
-# # TEST
-X = torch.tensor(np.genfromtxt("X_train_norm_py.csv", delimiter=',', dtype='float64'))
-Fe = torch.tensor(np.genfromtxt("Fe_train_norm_py.csv", delimiter=',', dtype='float64'))
-R, W, crit, iter, r2 = RunBIOT(X, Fe,  0.0001, rotation=True)
-
-Pu = np.genfromtxt("Py_svd.csv", delimiter=',', dtype='float64')
-Ru = np.genfromtxt("R_svd.csv", delimiter=',', skip_header=1, dtype='float64')
-# diff = abs(Ru - Pu)
-# print(diff[diff > 1e-2])
-np.savetxt('Rsvd_Psvd.csv', Ru - Pu, delimiter=',')
-
-Pu = np.genfromtxt("Py_u.csv", delimiter=',', dtype='float64')
-Ru = np.genfromtxt("R_u.csv", delimiter=',', skip_header=1, dtype='float64')
-np.savetxt('Ru_Pu.csv', Ru - Pu, delimiter=',')
-
-# Pu = np.genfromtxt("Py_d.csv", delimiter=',', dtype='float64')
-# Ru = np.genfromtxt("R_d.csv", delimiter=',', skip_header=1, dtype='float64')
-# print( Ru - Pu )
-
-# Pu = np.genfromtxt("Py_v.csv", delimiter=',', dtype='float64')
-# Ru = np.genfromtxt("R_v.csv", delimiter=',', skip_header=1, dtype='float64')
-# print( Ru - Pu )
-
-# print(f"X:{W.shape}\nR:{R.shape}\ncrit:{crit}\niter:{iter}")
