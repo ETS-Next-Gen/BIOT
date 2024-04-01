@@ -11,13 +11,13 @@ def GetWLasso (X, Y, lam, device="cpu"):
                          lam=lam,
                          device=device)
   
-  W = torch.stack([model.fit(X, col) for col in Y.T])
+  W = (torch.stack([model.fit(X, col) for col in Y.T]).to(device)).T
   # W = torch.zeros((X.shape[1], Y.shape[1]), dtype=torch.float64)
   # for k in range(0, Y.shape[1]):
   #   print(f"Processing weight {k}")
   #   W[:, k] = model.fit(X, Y[:, k].unsqueeze(1))
 
-  return ( W.T, GetRSquared(X, Y, W) )
+  return ( W, GetRSquared(X, Y, W) )
 
   
 class Lasso_Regression():
@@ -72,5 +72,3 @@ def GetRSquared(X, Y, W):
   '''
   
   return 1 - (torch.sum((X @ W - Y)**2) / torch.sum((Y - torch.mean(Y))**2))
-
-

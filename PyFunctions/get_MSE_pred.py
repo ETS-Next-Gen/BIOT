@@ -10,6 +10,6 @@ def GetMSEPred(Fe, X, R, W):
   
   Returns the MSE
   """
-  nrow, ncol = X.size()
+  nrow, ncol = X.shape
 
   return (1 / (2 * nrow * ncol)) * np.sum((X @ R - Fe @ W)**2)

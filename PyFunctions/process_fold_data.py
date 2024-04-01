@@ -1,7 +1,6 @@
 import numpy as np
-from sklearn.preprocessing import StandardScaler
 
-def ProcessFoldData(X, Fe, testId, which_dummy = None) -> list:
+def ProcessFoldData(X, Fe, testId, which_dummy = None):
   
   """
   X: embedding matrix (response)
@@ -10,16 +9,20 @@ def ProcessFoldData(X, Fe, testId, which_dummy = None) -> list:
   dummy: vector whose elements = T if the corresponding column in Fe is a dummy variable, F otherwise
   
   """
+
   if which_dummy is None:
     which_dummy = np.repeat(False, Fe.shape[1])
+    # which_dummy = torch.zeros(Fe.shape[1], dtype=torch.bool)
   
   # Gathering test data using given train IDs
   train_id = np.setdiff1d(np.arange(X.shape[0]), testId)
+  # train_id = torch.tensor(list(set(range(X.shape[0])) - set(testId)), device=device)
   Fe_test = Fe[testId, :]
   X_test = X[testId, :]
 
   # Iolate non dummy features
   not_dummy = np.where(~np.isin(np.arange(1, Fe.shape[1] + 1), which_dummy))[0]
+  # not_dummy = torch.tensor(list(set(range(0, Fe.shape[1])) - set(which_dummy.nonzero().flatten())), device=device)
   Fe_train = Fe[train_id[:, None], not_dummy]
 
   # Mean and Std Dev of non-dummy features in the training data
@@ -36,22 +39,15 @@ def ProcessFoldData(X, Fe, testId, which_dummy = None) -> list:
   X_mean = np.mean(X[train_id, :], axis=0)
 
   # Scale and center training dataset using its mean and sd
-  # scaler = StandardScaler()
-  # Fe_norm = scaler.fit_transform(Fe_train)
-  # Fe_norm = np.column_stack((Fe[train_id[:, None], which_dummy], Fe_norm))
-  # X_norm = StandardScaler(with_std=False).fit_transform(X[train_id, :])
-
   Fe_norm = (Fe_train - Fe_mean) / Fe_sd
   Fe_norm = np.column_stack((Fe[train_id[:, None], which_dummy], Fe_norm))
+  # Fe_norm = torch.cat((Fe[train_id[:, None], which_dummy], Fe_norm))
   X_norm = X[train_id, :] - X_mean
 
   # Scale and center test set using means and sds from the training set
-  # Fe_test = scaler.fit_transform(Fe_test[:, not_dummy])
-  # Fe_test = np.column_stack((Fe_test[:, which_dummy], Fe_test))
-  # X_test = StandardScaler(with_std=False).fit_transform(X_test)
-
   Fe_test = Fe_test[:, not_dummy] - Fe_mean / Fe_sd
   Fe_test = np.column_stack((Fe_test[:, which_dummy], Fe_test))
-  X_test = X[train_id, :] - X_mean
+  # Fe_test = torch.cat((Fe_test[:, which_dummy], Fe_test))
+  X_test = X_test - X_mean
 
   return ( Fe_norm, X_norm, Fe_test, X_test ) 
