@@ -84,7 +84,7 @@ def runtime():
   DatasetPath = "Datasets/dataset.csv"
   EmbeddingPath = "Datasets/embedding.csv"
 
-  # heap_status1 = h.heap()
+  heap_status1 = h.heap()
 
   X1 = StandardScaler(with_std=False).fit_transform(np.genfromtxt(EmbeddingPath, delimiter=',', dtype='float64'))
   Fe1 = StandardScaler().fit_transform(np.genfromtxt(DatasetPath, delimiter=',', skip_header=1, dtype='float64'))
@@ -95,13 +95,12 @@ def runtime():
   # lambdas = torch.tensor([10000, 1000, 500, 300, 200, 100, 50, 10, 1, 0.0001], dtype=torch.float64)
   lambdas = torch.tensor([100, 0.0001], dtype=torch.float64, device=device)
 
-  # W = Lasso(Fe, X, lambdas)
+  W = Lasso(Fe, X, lambdas)
 
-  # heap_status2 = h.heap()
-  # print(heap_status2.size - heap_status1.size)
+  heap_status2 = h.heap()
+  print(f"Mem: {heap_status2.size - heap_status1.size}")
 
-  K = 5
-  tot = 0
+  K = 30
   times = []
   for i in range(K):
 
@@ -112,7 +111,6 @@ def runtime():
     elapsed = time.time() - s
     times.append(elapsed)
     print(elapsed)
-    tot += elapsed
 
 
   r2 = GetRSquared(Fe, X, W)

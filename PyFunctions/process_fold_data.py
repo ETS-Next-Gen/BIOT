@@ -3,7 +3,7 @@ import torch
 
 torch.set_default_device("cuda" if torch.cuda.is_available() else "cpu")
 
-def ProcessFoldData(X, Fe, testId, which_dummy = None):
+def ProcessFoldData(X, Fe, testId, which_dummy = None, device='cpu'):
   
   """
   X: embedding matrix (response)
@@ -15,8 +15,8 @@ def ProcessFoldData(X, Fe, testId, which_dummy = None):
 
   # Define dummy and non dummy columns
   if which_dummy is None:
-    which_dummy = torch.zeros(Fe.shape[1], dtype=torch.bool)
-  not_dummy = torch.tensor(list(set(range(0, Fe.shape[1])) - set(which_dummy.nonzero().flatten())))
+    which_dummy = torch.zeros(Fe.shape[1], dtype=torch.bool, device=device)
+  not_dummy = torch.tensor(list(set(range(0, Fe.shape[1])) - set(which_dummy.nonzero().flatten())), device=device)
   
   # Gathering train IDs
   uniques, counts = torch.cat((torch.arange(Fe.shape[0]), testId)).unique(return_counts=True)
@@ -65,39 +65,32 @@ import time
 import numpy as np
 from guppy import hpy; h=hpy()
 
-X = torch.tensor(np.genfromtxt("Datasets/embedding.csv", delimiter=',', dtype='float64'))
-Fe =  torch.tensor(np.genfromtxt("Datasets/dataset.csv", delimiter=',', skip_header=1, dtype='float64'))
-foldIds = torch.split(torch.randperm(Fe.size(0)), Fe.size(0) // 10)
-foldIds = torch.tensor([28, 12, 20])
+def testing():
+  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  print(f"Device: {device}")
 
-heap_status1 = h.heap()
+  X = torch.tensor(np.genfromtxt("Datasets/embedding.csv", delimiter=',', dtype='float64'), device=device)
+  Fe =  torch.tensor(np.genfromtxt("Datasets/dataset.csv", delimiter=',', skip_header=1, dtype='float64'), device=device)
+  # foldIds = torch.split(torch.randperm(Fe.size(0)), Fe.size(0) // 10)
+  foldIds = torch.tensor([28, 12, 20], device=device)
 
-Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds)
-
-heap_status2 = h.heap()
-print(heap_status2.size - heap_status1.size)
-
-K = 30
-tot = 0
-times = []
-for i in range(0, K):
-  s = time.time()
+  heap_status1 = h.heap()
 
   Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds)
 
-  elapsed = time.time() - s
+  heap_status2 = h.heap()
+  print(f"Mem: {heap_status2.size - heap_status1.size}")
 
-  times.append(elapsed)
-  print(elapsed)
-  tot += elapsed
+  K = 30
+  times = []
+  for i in range(0, K):
+    s = time.time()
 
-# Plotting
-# plt.plot(range(1, K + 1), times, marker='o', linestyle='-', color='yellow')
-# Rtimes = [0.092379093170166, 0.0613079071044922, 0.0906660556793213, 0.226000070571899, 0.345158815383911, 0.0704560279846191, 0.206289052963257, 0.0491559505462646, 0.0450129508972168, 0.131519079208374]
-# # plt.plot(range(1, K + 1), Rtimes, marker='o', linestyle='-', color='blue')
+    Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds)
 
-# plt.xlabel('Iteration')
-# plt.ylabel('Runtime (s)')
-# plt.title('Process Fold Data Runtime per Iteration')
-# plt.grid(True)
-# plt.show()
+    elapsed = time.time() - s
+
+    times.append(elapsed)
+    print(elapsed)
+
+testing()

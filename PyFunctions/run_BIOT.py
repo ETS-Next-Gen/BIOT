@@ -108,12 +108,12 @@ def testing():
   X1 = StandardScaler(with_std=False).fit_transform(np.genfromtxt(EmbeddingPath, delimiter=',', dtype='float64'))
   Fe1 = StandardScaler().fit_transform(np.genfromtxt(DatasetPath, delimiter=',', skip_header=1, dtype='float64'))
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  print(f"Device: {device}")
   X = torch.tensor(X1, device=device)
   Fe = torch.tensor(Fe1, device=device)
   lambdas = torch.tensor([100, 0.0001], dtype=torch.float64, device=device)
 
   K = 30
-  tot = 0
   times = []
   print("start...")
   for i in range(K):
@@ -125,9 +125,10 @@ def testing():
     elapsed = time.time() - s
     times.append(elapsed)
     print(elapsed)
-    tot += elapsed
 
-  print(torch.sum(r2) / 384)
+  print({f"R2: {torch.sum(r2) / 384}"})
+  print(f"Iters: {iter}")
+  print(f"Crit: {crit}")
 
 testing()
 
