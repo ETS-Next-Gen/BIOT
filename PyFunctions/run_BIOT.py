@@ -1,7 +1,7 @@
-from PyFunctions.get_W_Lasso import GetWLasso
+from get_W_Lasso import Lasso
 import torch
 
-def RunBIOT(X, Fe, lam, maxIter = 200, eps = 1e-6, rotation = False):
+def RunBIOT(X, Fe, lam, maxIter = 2, eps = 1e-6, rotation = False, device='cpu'):
   '''
   X: embedding matrix (response)
   Fe: external feature matrix (predictors)
@@ -12,11 +12,8 @@ def RunBIOT(X, Fe, lam, maxIter = 200, eps = 1e-6, rotation = False):
   '''
 
   # Store all variables in the appropriate device memory, ideally, GPU if available.
-  device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-  X = torch.tensor(X, device=device)
-  Fe = torch.tensor(Fe, device=device)
-  print("\t\t\tIter 0: Getting weights")
-  W, r2 = GetWLasso(X=Fe, Y=X, lam=lam)
+  # print("\t\t\tIter 0: Getting weights...")
+  W, r2 = Lasso(Fe, X, lam, device=device)
   # W = torch.ones((Fe.shape[1], X.shape[1]), dtype=torch.float64).to(device)
 
   diff = 1
@@ -47,8 +44,8 @@ def RunBIOT(X, Fe, lam, maxIter = 200, eps = 1e-6, rotation = False):
       R = u @ v.t()
     
     # Find the new weights and r^2 
-    print(f"\t\t\tIter {iter}: Getting weights...")
-    W, r2 = GetWLasso(X=Fe, Y=X@R, lam=lam)
+    # print(f"\t\t\tIter {iter}: Getting weights...")
+    W, r2 = Lasso(Fe, X@R, lam, device=device)
 
     # Find the difference between the critical values of the current and previous iteration.
     # We will stop iterating once this difference is less than epsilon.
@@ -59,7 +56,7 @@ def RunBIOT(X, Fe, lam, maxIter = 200, eps = 1e-6, rotation = False):
     iter += 1
   
 
-  return ( R, W.numpy(), iter, crit, r2 ) 
+  return ( R, W, iter, crit, r2 ) 
 
 
 def BIOTCrit(Fe, X, R, W, lam):
@@ -77,7 +74,7 @@ def BIOTCrit(Fe, X, R, W, lam):
 
   return ( n * torch.sum( torch.diag( mx.T @ mx)) + loss )
 
-# # TEST
+# TEST
 # X = torch.tensor(np.genfromtxt("X_train_norm_py.csv", delimiter=',', dtype='float64'))
 # Fe = torch.tensor(np.genfromtxt("Fe_train_norm_py.csv", delimiter=',', dtype='float64'))
 # R, W, crit, iter, r2 = RunBIOT(X, Fe,  0.0001, rotation=True)
@@ -100,4 +97,40 @@ def BIOTCrit(Fe, X, R, W, lam):
 # Ru = np.genfromtxt("R_v.csv", delimiter=',', skip_header=1, dtype='float64')
 # print( Ru - Pu )
 
-# print(f"X:{W.shape}\nR:{R.shape}\ncrit:{crit}\niter:{iter}")
+def testing():
+  import numpy as np
+  import time
+  from sklearn.preprocessing import StandardScaler
+  import matplotlib.pyplot as plt
+  from guppy import hpy; h=hpy()
+
+  DatasetPath = "Datasets/dataset.csv"
+  EmbeddingPath = "Datasets/embedding.csv"
+  X1 = StandardScaler(with_std=False).fit_transform(np.genfromtxt(EmbeddingPath, delimiter=',', dtype='float64'))
+  Fe1 = StandardScaler().fit_transform(np.genfromtxt(DatasetPath, delimiter=',', skip_header=1, dtype='float64'))
+  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  X = torch.tensor(X1, device=device)
+  Fe = torch.tensor(Fe1, device=device)
+  lambdas = torch.tensor([100, 0.0001], dtype=torch.float64, device=device)
+
+  K = 30
+  tot = 0
+  times = []
+  print("start...")
+  for i in range(K):
+
+    s = time.time()
+
+    R, W, crit, iter, r2 = RunBIOT(X, Fe,  lambdas, rotation=True, device=device)
+
+    elapsed = time.time() - s
+    times.append(elapsed)
+    print(elapsed)
+    tot += elapsed
+
+  print(torch.sum(r2) / 384)
+
+testing()
+
+
+
