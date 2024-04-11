@@ -101,7 +101,6 @@ def testing():
   import numpy as np
   import time
   from sklearn.preprocessing import StandardScaler
-  import matplotlib.pyplot as plt
   from guppy import hpy; h=hpy()
 
   DatasetPath = "Datasets/dataset.csv"
