@@ -120,5 +120,5 @@ def runtime():
   avg = torch.sum(r2) / (384)
   print(f"Average r2: {avg}")
   
-runtime()
+# runtime()
 
