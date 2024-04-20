@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-torch.set_default_device("cuda" if torch.cuda.is_available() else "cpu")
+# torch.set_default_device("cuda" if torch.cuda.is_available() else "cpu")
 
 def ProcessFoldData(X, Fe, testId, which_dummy = None, device='cpu'):
   
@@ -19,7 +19,7 @@ def ProcessFoldData(X, Fe, testId, which_dummy = None, device='cpu'):
   not_dummy = torch.tensor(list(set(range(0, Fe.shape[1])) - set(which_dummy.nonzero().flatten())), device=device)
   
   # Gathering train IDs
-  uniques, counts = torch.cat((torch.arange(Fe.shape[0]), testId)).unique(return_counts=True)
+  uniques, counts = torch.cat((torch.arange(Fe.shape[0], device=device), testId)).unique(return_counts=True)
   train_id = uniques[counts == 1]
 
   # Gathering test data
@@ -44,7 +44,7 @@ def ProcessFoldData(X, Fe, testId, which_dummy = None, device='cpu'):
 
   # Scale and center features using its mean and sd
   Fe_norm = (Fe_train - Fe_mean) / Fe_sd
-  Fe_test = Fe_test[:, not_dummy] - Fe_mean / Fe_sd
+  Fe_test = (Fe_test[:, not_dummy] - Fe_mean) / Fe_sd
 
   # Center embeddings using mean
   X_norm = X[train_id, :] - X_mean
@@ -74,23 +74,59 @@ def testing():
   # foldIds = torch.split(torch.randperm(Fe.size(0)), Fe.size(0) // 10)
   foldIds = torch.tensor([28, 12, 20], device=device)
 
-  heap_status1 = h.heap()
+  # heap_status1 = h.heap()
 
-  Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds)
+  Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds, device=device)
 
-  heap_status2 = h.heap()
-  print(f"Mem: {heap_status2.size - heap_status1.size}")
+  # np.savetxt('Fe_norm_py.csv', Fe_norm, delimiter=',')
+  # np.savetxt('X_norm_py.csv', X_norm, delimiter=',')
+  # np.savetxt('Fe_test_py.csv', Fe_test, delimiter=',')
+  # np.savetxt('X_test_py.csv', X_test, delimiter=',')
+
+  Fe_norm_r = np.loadtxt('Fe_norm_r.csv', delimiter=',', skiprows=1)
+  X_norm_r = np.loadtxt('X_norm_r.csv', delimiter=',', skiprows=1)
+  Fe_test_r = np.loadtxt('Fe_test_r.csv', delimiter=',', skiprows=1)
+  X_test_r = np.loadtxt('X_test_r.csv', delimiter=',', skiprows=1)
+
+  # Calculate differences
+  Fe_norm_diff = abs(Fe_norm_r - Fe_norm.numpy())
+  X_norm_diff = abs(X_norm_r - X_norm.numpy())
+  Fe_test_diff = abs(Fe_test_r - Fe_test.numpy())
+  X_test_diff = abs(X_test_r - X_test.numpy())
+
+  # print(Fe_norm_diff[abs(Fe_norm_diff) > 1e-15])
+  print(np.mean(Fe_norm_diff))
+  print(np.min(Fe_norm_diff))
+  print(np.max(Fe_norm_diff))
+
+  print(np.mean(X_norm_diff))
+  print(np.min(X_norm_diff))
+  print(np.max(X_norm_diff))
+
+  print(np.mean(Fe_test_diff))
+  print(np.min(Fe_test_diff))
+  print(np.max(Fe_test_diff))
+
+  print(np.mean(X_test_diff))
+  print(np.min(X_test_diff))
+  print(np.max(X_test_diff))
+  quit()
+
+  # heap_status2 = h.heap()
+  # print(f"Mem: {heap_status2.size - heap_status1.size}")
 
   K = 30
   times = []
   for i in range(0, K):
     s = time.time()
 
-    Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds)
+    Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds, device=device)
 
     elapsed = time.time() - s
 
     times.append(elapsed)
     print(elapsed)
+
+
 
 testing()

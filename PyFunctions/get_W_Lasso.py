@@ -95,7 +95,7 @@ def runtime():
   # lambdas = torch.tensor([10000, 1000, 500, 300, 200, 100, 50, 10, 1, 0.0001], dtype=torch.float64)
   lambdas = torch.tensor([100, 0.0001], dtype=torch.float64, device=device)
 
-  W = Lasso(Fe, X, lambdas)
+  W = Lasso(Fe, X, lambdas, device=device)
 
   heap_status2 = h.heap()
   print(f"Mem: {heap_status2.size - heap_status1.size}")
