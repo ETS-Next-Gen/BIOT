@@ -69,8 +69,9 @@ def testing():
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
   print(f"Device: {device}")
 
-  X = torch.tensor(np.genfromtxt("Datasets/embedding.csv", delimiter=',', dtype='float64'), device=device)
-  Fe =  torch.tensor(np.genfromtxt("Datasets/dataset.csv", delimiter=',', skip_header=1, dtype='float64'), device=device)
+  home = "Datasets/"
+  X = torch.tensor(np.genfromtxt(home + "embedding.csv", delimiter=',', dtype='float64'), device=device)
+  Fe =  torch.tensor(np.genfromtxt(home + "dataset.csv", delimiter=',', skip_header=1, dtype='float64'), device=device)
   # foldIds = torch.split(torch.randperm(Fe.size(0)), Fe.size(0) // 10)
   foldIds = torch.tensor([28, 12, 20], device=device)
 
