@@ -74,10 +74,33 @@ def testing():
   # foldIds = torch.split(torch.randperm(Fe.size(0)), Fe.size(0) // 10)
   foldIds = torch.tensor([28, 12, 20], device=device)
 
-  # heap_status1 = h.heap()
+  heap_status1 = h.heap()
 
   Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds, device=device)
 
+  heap_status2 = h.heap()
+  print(f"Mem: {heap_status2.size - heap_status1.size}")
+
+  K = 30
+  times = []
+  for i in range(0, K):
+    s = time.time()
+
+    Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds, device=device)
+
+    elapsed = time.time() - s
+
+    times.append(elapsed)
+    print(elapsed)
+
+  print(Fe_norm)
+  print(X_norm)
+  print(Fe_test)
+  print(X_test)
+
+testing()
+
+def comparing(Fe_norm, X_norm, Fe_test, X_test):
   # np.savetxt('Fe_norm_py.csv', Fe_norm, delimiter=',')
   # np.savetxt('X_norm_py.csv', X_norm, delimiter=',')
   # np.savetxt('Fe_test_py.csv', Fe_test, delimiter=',')
@@ -110,23 +133,3 @@ def testing():
   print(np.mean(X_test_diff))
   print(np.min(X_test_diff))
   print(np.max(X_test_diff))
-  quit()
-
-  # heap_status2 = h.heap()
-  # print(f"Mem: {heap_status2.size - heap_status1.size}")
-
-  K = 30
-  times = []
-  for i in range(0, K):
-    s = time.time()
-
-    Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds, device=device)
-
-    elapsed = time.time() - s
-
-    times.append(elapsed)
-    print(elapsed)
-
-
-
-testing()
