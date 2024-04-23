@@ -22,10 +22,10 @@ OutPath = "Results/"
 # DEFAULT VARIABLE VALUES
 Nlambdas = 5
 MinLambda = 0.0001
-MaxLambda = 3.5
-K = 5  # no of folds used for cross validation
-sigThresh = 0.05  # sigma threshold ?
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # checks for gpu
+MaxLambda = 3.5 
+K = 10            # no of folds used for cross validation
+sigThresh = .05   # sigma threshold ?
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")     # checks for gpu
 
 
 # HELPER FUNCTION
@@ -40,10 +40,11 @@ def Eval(
 
     Returns MSE between XR and FeW and percent nonzero of W
     """
-
-    MSE = GetMSEPred(Fe=Fe_test, X=X_test, R=R, W=W)
-
-    percent_nonzero = np.count_nonzero(W) / np.prod(W.shape)
+    MSE = GetMSEPred(Fe = Fe_test, 
+                      X = X_test,
+                      R = R, 
+                      W = W)
+    percent_nonzero = torch.count_nonzero(W) / torch.prod(W.shape)
 
     return (MSE, percent_nonzero)
 
@@ -55,15 +56,13 @@ def main(
     outPath: str,
     nLambdas: int,
     minLambda: int,
-    maxLambda: int,
-) -> None:
+    maxLambda: int
+  ):
 
     # Define lambda vector, feature vector, and embedding vector
-    lambdaVals = np.exp(np.linspace(np.log(minLambda), np.log(maxLambda), nLambdas))
-    # X = torch.tensor(np.genfromtxt(embeddingPath, delimiter=',', dtype='float64'), device=device)
-    # Fe =  torch.tensor(np.genfromtxt(dataPath, delimiter=',', skip_header=1, dtype='float64'), device=device)
-    X = np.genfromtxt(embeddingPath, delimiter=",", dtype="float64")
-    Fe = np.genfromtxt(dataPath, delimiter=",", skip_header=1, dtype="float64")
+    lambdaVals = torch.exp(torch.linspace(torch.log(minLambda), torch.log(maxLambda), nLambdas))
+    X = torch.tensor(np.genfromtxt(embeddingPath, delimiter=',', dtype='float64'), device=device)
+    Fe =  torch.tensor(np.genfromtxt(dataPath, delimiter=',', skip_header=1, dtype='float64'), device=device)
 
     ##############################################
     #### Run BIOT for different lambda values ####
@@ -71,47 +70,48 @@ def main(
 
     print("Selection of lambda in progress...")
 
-    # Set seed for random generation of data folds
-    np.random.seed(155000)
+    # Set seed for random generation of data folds, then generate fold IDs
+    foldIds = torch.split(torch.randperm(Fe.size(0)), Fe.size(0) // K)
     results = []
 
     # Perform cross validation for each lambda
     for lam in lambdaVals:
 
-        # Select lambda value
-        print("Processing lambda: ", lam)
-
-        # Split data into folds
-        foldIds = np.array_split(np.random.permutation(Fe.shape[0]), K)
+        # Select lambda value 
+        print('Processing lambda: ', lam)
 
         # Cross validation!
         fold_results = []
         for foldIdx in range(0, K):
-            print("\tProcessing fold index ", foldIdx)
+            print('\tProcessing fold index ', foldIdx)
 
-            # Process fold data
-            Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(
-                X=X, Fe=Fe, testId=foldIds[foldIdx]
-            )
+            # Data pre-processing
+            Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds[foldIdx])
 
             # Normalize lambda
-            lam_norm = lam / np.sqrt(Fe_norm.shape[1])
+            lam_norm = lam / torch.sqrt(Fe_norm.shape[1])
 
             print("\t\tRunning BIOT on fold data...")
             # Get rotation matrix and weights
-            R, W, crit, iter, r2 = RunBIOT(
-                X=X_norm, Fe=Fe_norm, lam=lam_norm, maxIter=2, rotation=True
-            )
+            R, W, crit, iter, r2 = RunBIOT(X = X_norm, 
+                         Fe = Fe_norm,
+                         lam = lam_norm, maxIter=2, rotation=True)
 
             # Evaluate results
-            MSE, perc_nonzero = Eval(R=R, W=W, Fe_test=Fe_test, X_test=X_test)
+            MSE, perc_nonzero = Eval(R = R, 
+                      W = W, 
+                      Fe_test = Fe_test,
+                      X_test = X_test)
 
+            # Make sure MSE is valid
             if MSE is not None:
                 fold_results.append([lam, lam_norm, MSE, perc_nonzero])
 
+        # Add output to final results
         results.append(fold_results)
 
     print("\nFinished running BIOT on fold data with different lambda values!")
+
 
     ####################################
     #### Now choose the best lambda ####
@@ -123,7 +123,7 @@ def main(
     lam_avg_mse = torch.zeros(len(results), device=device)
     for i, fold_results in enumerate(results):
         mse = torch.tensor([fold[2] for fold in fold_results], device=device)
-        avg = mse.mean()  # removes the scalar value from the calculated vector ?
+        avg = mse.mean() # removes the scalar value from the calculated vector ?
         lam_avg_mse[i] = avg
 
     # Find the lambda with the smallest average MSE
@@ -131,9 +131,7 @@ def main(
     lam_min_mse = lambdaVals[lam_min_mse_idx]
     print(f"\nLAMBDA WITH SMALLEST AVG MSE: {lam_min_mse}")
 
-    mse_min = torch.tensor(
-        [fold[2] for fold in results[lam_min_mse_idx]], device=device
-    )
+    mse_min = torch.tensor([fold[2] for fold in results[lam_min_mse_idx]], device=device)
     test_idx = lam_min_mse_idx + 1
     while test_idx < nLambdas:
         mse_new = torch.tensor([fold[2] for fold in results[test_idx]], device=device)
@@ -141,9 +139,7 @@ def main(
         if torch.sum(torch.abs(mse_min) - torch.abs(mse_new)) == 0:
             pval = 1
         else:
-            pval = wilcoxon(mse_min.numpy(), mse_new.numpy(), alternative="two-sided")[
-                1
-            ]
+            pval = wilcoxon(mse_min.numpy(), mse_new.numpy(), alternative='two-sided')[1]  
 
         if pval <= sigThresh:
             lam_best = test_idx - 1
@@ -154,15 +150,16 @@ def main(
 
         test_idx += 1
 
-    print(
-        f"The most sparse lambda that is not significantly different from the best lambda is {lambdaVals[lam_best]} at index {lam_best}"
-    )
+    print(f"The most sparse lambda that is not significantly different from the best lambda is {lambdaVals[lam_best]} at index {lam_best}")
+
 
     ################################################################
     #### Now run BIOT with the best lambda on the whole dataset ####
     ################################################################
 
-    R, W, crit, iter, r2 = RunBIOT(X=X_norm, Fe=Fe_norm, lam=lam_norm, rotation=True)
+    R, W, crit, iter, r2 = RunBIOT(X = X_norm, 
+                     Fe = Fe_norm,
+                     lam = lam_norm, rotation=True)
 
     # Save regression weights to a CSV file
     np.savetxt(f"{outPath}/Weights.csv", W, delimiter=",")
@@ -171,7 +168,7 @@ def main(
     np.savetxt(f"{outPath}/R2.csv", r2, delimiter=",")
 
     # Output centered and scaled X
-    scaledX = {"Scaled Mx": (X - X.mean(axis=0)) / X.std(axis=0, ddof=1)}
+    scaledX = {'Scaled Mx': (X - X.mean(axis=0)) / X.std(axis=0, ddof=1)}
     np.savetxt(f"{outPath}/ScaledX.csv", scaledX, delimiter=",")
 
     # Output the rotated mx
