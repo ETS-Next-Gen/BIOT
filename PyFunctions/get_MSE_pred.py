@@ -1,4 +1,4 @@
-import numpy as np
+import torch
 
 def GetMSEPred(Fe, X, R, W):
   
@@ -12,4 +12,4 @@ def GetMSEPred(Fe, X, R, W):
   """
   nrow, ncol = X.shape
 
-  return (1 / (2 * nrow * ncol)) * np.sum((X @ R - Fe @ W)**2)
+  return (1 / (2 * nrow * ncol)) * torch.sum((X @ R - Fe @ W)**2)

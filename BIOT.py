@@ -21,7 +21,7 @@ OutPath = "Results/"
 Nlambdas = 5
 MinLambda = 0.0001
 MaxLambda = 3.5 
-K = 5            # no of folds used for cross validation
+K = 10            # no of folds used for cross validation
 sigThresh = .05   # sigma threshold ?
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")     # checks for gpu
 
@@ -42,7 +42,7 @@ def Eval(R, W, Fe_test, X_test):
                     R = R, 
                     W = W)
   
-  percent_nonzero = np.count_nonzero(W) / np.prod(W.shape)
+  percent_nonzero = torch.count_nonzero(W) / torch.prod(W.shape)
 
   return (MSE, percent_nonzero)
 
@@ -58,11 +58,9 @@ def main(
 ):
 
   # Define lambda vector, feature vector, and embedding vector
-  lambdaVals = np.exp(np.linspace(np.log(minLambda), np.log(maxLambda), nLambdas))
-  # X = torch.tensor(np.genfromtxt(embeddingPath, delimiter=',', dtype='float64'), device=device)
-  # Fe =  torch.tensor(np.genfromtxt(dataPath, delimiter=',', skip_header=1, dtype='float64'), device=device)
-  X = np.genfromtxt(embeddingPath, delimiter=',', dtype='float64')
-  Fe =  np.genfromtxt(dataPath, delimiter=',', skip_header=1, dtype='float64')
+  lambdaVals = torch.exp(torch.linspace(torch.log(minLambda), torch.log(maxLambda), nLambdas))
+  X = torch.tensor(np.genfromtxt(embeddingPath, delimiter=',', dtype='float64'), device=device)
+  Fe =  torch.tensor(np.genfromtxt(dataPath, delimiter=',', skip_header=1, dtype='float64'), device=device)
 
   ##############################################
   #### Run BIOT for different lambda values ####
@@ -70,8 +68,8 @@ def main(
 
   print("Selection of lambda in progress...")
 
-  # Set seed for random generation of data folds
-  np.random.seed(155000)
+  # Set seed for random generation of data folds, then generate fold IDs
+  foldIds = torch.split(torch.randperm(Fe.size(0)), Fe.size(0) // K)
   results = []
 
   # Perform cross validation for each lambda
@@ -80,19 +78,16 @@ def main(
     # Select lambda value 
     print('Processing lambda: ', lam)
 
-    # Split data into folds
-    foldIds = np.array_split(np.random.permutation(Fe.shape[0]), K)
-
     # Cross validation!
     fold_results = []
     for foldIdx in range(0, K):
       print('\tProcessing fold index ', foldIdx)
 
-      # Process fold data
+      # Data pre-processing
       Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds[foldIdx])
 
       # Normalize lambda
-      lam_norm = lam / np.sqrt(Fe_norm.shape[1])
+      lam_norm = lam / torch.sqrt(Fe_norm.shape[1])
 
       print("\t\tRunning BIOT on fold data...")
       # Get rotation matrix and weights
@@ -106,9 +101,11 @@ def main(
                 Fe_test = Fe_test,
                 X_test = X_test)
       
+      # Make sure MSE is valid
       if MSE is not None:
         fold_results.append([lam, lam_norm, MSE, perc_nonzero])
 
+    # Add output to final results
     results.append(fold_results)
   
   print("\nFinished running BIOT on fold data with different lambda values!")
