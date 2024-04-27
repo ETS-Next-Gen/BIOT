@@ -6,6 +6,7 @@ def RunBIOT(
     X: torch.Tensor,
     Fe: torch.Tensor,
     lam: float,
+    device: t.Literal['cpu', 'gpu'] = 'cpu',
     maxIter: int = 200,
     eps: float = 1e-6,
     rotation: bool = False,

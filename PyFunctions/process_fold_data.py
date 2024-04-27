@@ -3,7 +3,7 @@ import torch
 
 # torch.set_default_device("cuda" if torch.cuda.is_available() else "cpu")
 
-def ProcessFoldData(X: torch.Tensor, Fe: torch.Tensor,, testId: torch.Tensor, which_dummy = None, device='cpu'):
+def ProcessFoldData(X: torch.Tensor, Fe: torch.Tensor, testId: torch.Tensor, which_dummy = None, device='cpu'
 ) -> t.Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     X: embedding matrix (response)

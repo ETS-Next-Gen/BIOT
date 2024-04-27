@@ -13,8 +13,16 @@ def GetRSquared(X: torch.Tensor, Y: torch.Tensor, W: torch.Tensor) -> torch.Tens
     return 1 - (torch.sum((X @ W - Y)**2, dim=0) / torch.sum((Y - torch.mean(Y))**2, dim=0))
 
 
-def Lasso(X: torch.Tensor, Y: torch.Tensor, lambdas, maxIter=100000, device='cpu', alpha=0.1, intercept=False, thresh=1e-7
-): -> t.Tuple[torch.Tensor, torch.Tensor]:
+def Lasso(
+        X: torch.Tensor, 
+        Y: torch.Tensor, 
+        lambdas: torch.Tensor, 
+        maxIter: int=100000, 
+        device: t.Literal['cpu', 'gpu'] = 'cpu', 
+        alpha: float=0.1, 
+        intercept: bool=False, 
+        thresh: float=1e-7
+) -> t.Tuple[torch.Tensor, torch.Tensor]:
     """
     X: predictor matrix
     Y: response matrix
