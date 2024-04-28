@@ -108,16 +108,7 @@ def main(
     results.append(fold_results)
   
   print("\nFinished running BIOT on fold data with different lambda values!")
-
-  import csv
-
-  # File path to save the CSV
-  file_path = "data.csv"
-
-  # Writing the data to a CSV file
-  with open(file_path, mode='w', newline='') as file:
-      writer = csv.writer(file)
-      writer.writerows(results)
+  
 
   ####################################
   #### Now choose the best lambda ####
@@ -200,7 +191,7 @@ def main(
 
 
 ####################################
-#### Run MAIN                   ####
+##   Run MAIN   ####################
 ####################################
   
 if __name__ == "__main__":
