@@ -3,8 +3,6 @@
 ##############################################
 
 import argparse
-import typing as t
-
 import numpy as np
 import torch
 from scipy.stats import wilcoxon
@@ -20,201 +18,215 @@ EmbeddingPath = "Datasets/embedding.csv"
 OutPath = "Results/"
 
 # DEFAULT VARIABLE VALUES
-Nlambdas = 5
-MinLambda = 0.0001
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")     # checks for gpu
+Nlambdas = 10
+MinLambda = .0001
 MaxLambda = 3.5 
 K = 10            # no of folds used for cross validation
 sigThresh = .05   # sigma threshold ?
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")     # checks for gpu
-
 
 # HELPER FUNCTION
-def Eval(
-    R: torch.Tensor, W: torch.Tensor, Fe_test: torch.Tensor, X_test: torch.Tensor
-) -> t.Tuple[float, float]:
-    """
-    R: orthogonal transformation matrix
-    W: regression weights
-    Fe.test: external feature matrix (predictors), test set only
-    X.test: embedding matrix (response), test set only
+def Eval(R, W, Fe_test, X_test):
+  '''  
+  R: orthogonal transformation matrix
+  W: regression weights
+  Fe.test: external feature matrix (predictors), test set only
+  X.test: embedding matrix (response), test set only
 
-    Returns MSE between XR and FeW and percent nonzero of W
-    """
-    MSE = GetMSEPred(Fe = Fe_test, 
-                      X = X_test,
-                      R = R, 
-                      W = W)
-    percent_nonzero = torch.count_nonzero(W) / torch.prod(W.shape)
+  Returns MSE between XR and FeW and percent nonzero of W
+  '''
 
-    return (MSE, percent_nonzero)
+  MSE = GetMSEPred(Fe = Fe_test, 
+                    X = X_test,
+                    R = R, 
+                    W = W)
+  
+  percent_nonzero = torch.count_nonzero(W) / torch.prod(torch.tensor(W.shape))
+
+  return (MSE, percent_nonzero)
 
 
 # MAIN FUNCTION
 def main(
-    dataPath: str,
-    embeddingPath: str,
-    outPath: str,
-    nLambdas: int,
-    minLambda: int,
-    maxLambda: int
-  ):
+  dataPath: str,
+  embeddingPath: str,
+  outPath: str,
+  nLambdas: int,
+  minLambda: int,
+  maxLambda: int
+):
+  
+  # Define lambda vector, feature vector, and embedding vector
+  lambdaVals = torch.exp(torch.linspace(np.log(minLambda), np.log(maxLambda), nLambdas)).to(device)
+  X = torch.tensor(np.genfromtxt(embeddingPath, delimiter=',', dtype='float64'), device=device)
+  Fe =  torch.tensor(np.genfromtxt(dataPath, delimiter=',', skip_header=1, dtype='float64'), device=device)
+  nFeatures = torch.tensor(Fe.shape[1], device=device)
 
-    # Define lambda vector, feature vector, and embedding vector
-    lambdaVals = torch.exp(torch.linspace(torch.log(minLambda), torch.log(maxLambda), nLambdas))
-    X = torch.tensor(np.genfromtxt(embeddingPath, delimiter=',', dtype='float64'), device=device)
-    Fe =  torch.tensor(np.genfromtxt(dataPath, delimiter=',', skip_header=1, dtype='float64'), device=device)
+  ##############################################
+  #### Run BIOT for different lambda values ####
+  ##############################################
 
-    ##############################################
-    #### Run BIOT for different lambda values ####
-    ##############################################
+  print("Selection of lambda in progress...")
 
-    print("Selection of lambda in progress...")
+  # Set seed for random generation of data folds, then generate fold IDs
+  foldIds = torch.split(torch.randperm(Fe.size(0)), Fe.size(0) // K)
+  results = []
 
-    # Set seed for random generation of data folds, then generate fold IDs
-    foldIds = torch.split(torch.randperm(Fe.size(0)), Fe.size(0) // K)
-    results = []
+  # Perform cross validation for each lambda
+  for lam in lambdaVals:
+  
+    # Select lambda value 
+    print('Processing lambda: ', lam)
 
-    # Perform cross validation for each lambda
-    for lam in lambdaVals:
+    # Cross validation!
+    fold_results = []
+    for foldIdx in range(0, K):
+      print('\tProcessing fold index ', foldIdx)
 
-        # Select lambda value 
-        print('Processing lambda: ', lam)
+      # Data pre-processing
+      Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds[foldIdx])
 
-        # Cross validation!
-        fold_results = []
-        for foldIdx in range(0, K):
-            print('\tProcessing fold index ', foldIdx)
+      # Normalize lambda;'
+      lam_norm = lam / torch.sqrt(nFeatures)
 
-            # Data pre-processing
-            Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds[foldIdx])
+      # Get rotation matrix and weights
+      R, W, crit, iter, r2 = RunBIOT(X = X_norm, 
+                   Fe = Fe_norm,
+                   lam = lam_norm, maxIter=2, rotation=True)
+      
+      # Evaluate results
+      MSE, perc_nonzero = Eval(R = R, 
+                W = W, 
+                Fe_test = Fe_test,
+                X_test = X_test)
+      
+      # Make sure MSE is valid
+      if MSE is not None:
+        fold_results.append([lam, lam_norm, MSE, perc_nonzero])
 
-            # Normalize lambda
-            lam_norm = lam / torch.sqrt(Fe_norm.shape[1])
+    # Add output to final results
+    results.append(fold_results)
+  
+  print("\nFinished running BIOT on fold data with different lambda values!")
 
-            print("\t\tRunning BIOT on fold data...")
-            # Get rotation matrix and weights
-            R, W, crit, iter, r2 = RunBIOT(X = X_norm, 
-                         Fe = Fe_norm,
-                         lam = lam_norm, maxIter=2, rotation=True)
+  import csv
 
-            # Evaluate results
-            MSE, perc_nonzero = Eval(R = R, 
-                      W = W, 
-                      Fe_test = Fe_test,
-                      X_test = X_test)
+  # File path to save the CSV
+  file_path = "data.csv"
 
-            # Make sure MSE is valid
-            if MSE is not None:
-                fold_results.append([lam, lam_norm, MSE, perc_nonzero])
+  # Writing the data to a CSV file
+  with open(file_path, mode='w', newline='') as file:
+      writer = csv.writer(file)
+      writer.writerows(results)
 
-        # Add output to final results
-        results.append(fold_results)
+  ####################################
+  #### Now choose the best lambda ####
+  ####################################
+    
+  print("\nNow calculating the best lambda...")
 
-    print("\nFinished running BIOT on fold data with different lambda values!")
+  # Calculate all of the average MSEs for each lambda across all folds of data
+  lam_avg_mse = torch.zeros(len(results), device=device)
+  for i, fold_results in enumerate(results):
+    mse = torch.tensor([fold[2] for fold in fold_results], device=device)
+    fold_avg = mse.mean() # removes the scalar value from the calculated vector ?
+    lam_avg_mse[i] = fold_avg
+  
+  # Find the lambda with the smallest average MSE
+  lam_best = lam_min_mse_idx = torch.argmin(lam_avg_mse).item()
+  lam_min_mse = lambdaVals[lam_min_mse_idx]
+  print(f"\nLAMBDA WITH SMALLEST AVG MSE: {lam_min_mse}")
 
+  mse_min = torch.tensor([fold[2] for fold in results[lam_min_mse_idx]], device=device)
+  test_idx = lam_min_mse_idx + 1
+  while test_idx < nLambdas:
+    mse_new = torch.tensor([fold[2] for fold in results[test_idx]], device=device)
 
-    ####################################
-    #### Now choose the best lambda ####
-    ####################################
+    if torch.sum(torch.abs(mse_min) - torch.abs(mse_new)) == 0:
+      pval = 1
+    else:
+      pval = wilcoxon(mse_min.numpy(), mse_new.numpy(), alternative='two-sided')[1]  
 
-    print("\nNow calculating the best lambda...")
+    if pval <= sigThresh:
+      lam_best = test_idx - 1
+      break
+    if pval > sigThresh and test_idx + 1 == Nlambdas:
+      lam_best = test_idx
+      break
 
-    # Calculate all of the average MSEs for each lambda across all folds of data
-    lam_avg_mse = torch.zeros(len(results), device=device)
-    for i, fold_results in enumerate(results):
-        mse = torch.tensor([fold[2] for fold in fold_results], device=device)
-        avg = mse.mean() # removes the scalar value from the calculated vector ?
-        lam_avg_mse[i] = avg
+    test_idx += 1
 
-    # Find the lambda with the smallest average MSE
-    lam_best = lam_min_mse_idx = torch.argmin(lam_avg_mse).item()
-    lam_min_mse = lambdaVals[lam_min_mse_idx]
-    print(f"\nLAMBDA WITH SMALLEST AVG MSE: {lam_min_mse}")
-
-    mse_min = torch.tensor([fold[2] for fold in results[lam_min_mse_idx]], device=device)
-    test_idx = lam_min_mse_idx + 1
-    while test_idx < nLambdas:
-        mse_new = torch.tensor([fold[2] for fold in results[test_idx]], device=device)
-
-        if torch.sum(torch.abs(mse_min) - torch.abs(mse_new)) == 0:
-            pval = 1
-        else:
-            pval = wilcoxon(mse_min.numpy(), mse_new.numpy(), alternative='two-sided')[1]  
-
-        if pval <= sigThresh:
-            lam_best = test_idx - 1
-            break
-        if pval > sigThresh and test_idx + 1 == Nlambdas:
-            lam_best = test_idx
-            break
-
-        test_idx += 1
-
-    print(f"The most sparse lambda that is not significantly different from the best lambda is {lambdaVals[lam_best]} at index {lam_best}")
+  print(f"The most sparse lambda that is not significantly different from the best lambda is {lambdaVals[lam_best]} at index {lam_best}")
 
 
-    ################################################################
-    #### Now run BIOT with the best lambda on the whole dataset ####
-    ################################################################
+  ################################################################
+  #### Now run BIOT with the best lambda on the whole dataset ####
+  ################################################################
 
-    R, W, crit, iter, r2 = RunBIOT(X = X_norm, 
-                     Fe = Fe_norm,
-                     lam = lam_norm, rotation=True)
+  R, W, crit, iter, r2 = RunBIOT(X = X_norm, 
+                   Fe = Fe_norm,
+                   lam = lam_norm, rotation=True)
 
-    # Save regression weights to a CSV file
-    np.savetxt(f"{outPath}/Weights.csv", W, delimiter=",")
+  # Save regression weights to a CSV file
+  np.savetxt(f"{outPath}/Weights.csv", W, delimiter=",")
 
-    # Save R-squared to a separate CSV file
-    np.savetxt(f"{outPath}/R2.csv", r2, delimiter=",")
+  # Save R-squared to a separate CSV file
+  np.savetxt(f"{outPath}/R2.csv", r2, delimiter=",")
 
-    # Output centered and scaled X
-    scaledX = {'Scaled Mx': (X - X.mean(axis=0)) / X.std(axis=0, ddof=1)}
-    np.savetxt(f"{outPath}/ScaledX.csv", scaledX, delimiter=",")
+  # Output centered and scaled X
+  scaledX = X - torch.mean(X, dim=0)
+  np.savetxt(f"{outPath}/ScaledX.csv", scaledX, delimiter=",")
 
-    # Output the rotated mx
-    RMatrix = scaledX @ R
-    np.savetxt(f"{outPath}/rMatrix.csv", RMatrix, delimiter=",")
-    np.savetxt(f"{outPath}/Rotation.csv", R, delimiter=",")
+  # Output the rotated mx
+  RMatrix = scaledX @ R
+  np.savetxt(f"{outPath}/rMatrix.csv", RMatrix, delimiter=",")
+  np.savetxt(f"{outPath}/Rotation.csv", R, delimiter=",")
 
-    # Output centered and scaled Features
-    scaledFe = (Fe - Fe.mean(axis=0)) / Fe.std(axis=0, ddof=1)
-    np.savetxt(f"{outPath}/scaledFeatures.csv", scaledFe, delimiter=",")
+  # Output centered and scaled Features
+  scaledFe = (Fe - torch.mean(Fe, dim=0)) / torch.std(Fe, dim=0)
+  np.savetxt(f"{outPath}/scaledFeatures.csv", scaledFe, delimiter=",")
 
-    # Calculate and save correlations
-    cors = np.corrcoef(RMatrix, scaledFe, rowvar=False)
-    np.savetxt(f"{outPath}/Cors.csv", cors, delimiter=",")
+  # Calculate and save correlations
+  cors = np.corrcoef(RMatrix, scaledFe, rowvar=False)
+  np.savetxt(f"{outPath}/Cors.csv", cors, delimiter=",")
 
-    # Combine matrices and save
-    combined = np.column_stack((RMatrix, scaledFe))
-    np.savetxt(f"{outPath}/combined.csv", combined, delimiter=",")
+  # Combine matrices and save
+  combined = np.column_stack((RMatrix, scaledFe))
+  np.savetxt(f"{outPath}/combined.csv", combined, delimiter=",")
 
-    # Calculate and save projection matrix
-    WMatrix = scaledFe @ W
-    np.savetxt(f"{outPath}/pMatrix.csv", WMatrix, delimiter=",")
+  # Calculate and save projection matrix
+  WMatrix = scaledFe @ W
+  np.savetxt(f"{outPath}/pMatrix.csv", WMatrix, delimiter=",")
 
 
 ####################################
 #### Run MAIN                   ####
 ####################################
-
+  
 if __name__ == "__main__":
 
-    # parse user arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--dataPath", default=DatasetPath)
-    parser.add_argument("-e", "--embeddingPath", default=EmbeddingPath)
-    parser.add_argument("-o", "--outPath", default=OutPath)
-    parser.add_argument("-n", "--nlambdas", default=Nlambdas)
-    parser.add_argument("-m", "--minLambda", default=MinLambda)
-    parser.add_argument("-x", "--maxLambda", default=MaxLambda)
-    args = parser.parse_args()
+  # parse user arguments
+  parser = argparse.ArgumentParser()
+  parser.add_argument("-d", "--dataPath",
+                      default=DatasetPath)
+  parser.add_argument("-e", "--embeddingPath",
+                      default=EmbeddingPath)
+  parser.add_argument("-o", "--outPath", 
+                      default=OutPath)
+  parser.add_argument("-n", "--nlambdas",
+                      default=Nlambdas)
+  parser.add_argument("-m", "--minLambda",
+                      default=MinLambda)
+  parser.add_argument("-x", "--maxLambda",
+                      default=MaxLambda)
+  args = parser.parse_args()
 
-    # run main!
-    main(
-        args.dataPath,
-        args.embeddingPath,
-        args.outPath,
-        args.nlambdas,
-        args.minLambda,
-        args.maxLambda,
-    )
+  # run main!
+  main(
+    args.dataPath,
+    args.embeddingPath,
+    args.outPath,
+    args.nlambdas,
+    args.minLambda,
+    args.maxLambda
+  )
