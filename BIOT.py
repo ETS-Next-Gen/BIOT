@@ -18,13 +18,12 @@ EmbeddingPath = "Datasets/embedding.csv"
 OutPath = "Results/"
 
 # DEFAULT VARIABLE VALUES
-Nlambdas = 5
-MinLambda = 0.0001
-MaxLambda = 3.5 
-K = 10            # no of folds used for cross validation
-sigThresh = .05   # sigma threshold ?
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")     # checks for gpu
-
+Nlambdas = 1
+MinLambda = .0001
+MaxLambda = 3.5 
+K = 2            # no of folds used for cross validation
+sigThresh = .05   # sigma threshold ?
 
 # HELPER FUNCTION
 def Eval(R, W, Fe_test, X_test):
@@ -42,7 +41,7 @@ def Eval(R, W, Fe_test, X_test):
                     R = R, 
                     W = W)
   
-  percent_nonzero = torch.count_nonzero(W) / torch.prod(W.shape)
+  percent_nonzero = torch.count_nonzero(W) / torch.prod(torch.tensor(W.shape))
 
   return (MSE, percent_nonzero)
 
@@ -56,11 +55,12 @@ def main(
   minLambda: int,
   maxLambda: int
 ):
-
+  
   # Define lambda vector, feature vector, and embedding vector
-  lambdaVals = torch.exp(torch.linspace(torch.log(minLambda), torch.log(maxLambda), nLambdas))
+  lambdaVals = torch.exp(torch.linspace(np.log(minLambda), np.log(maxLambda), nLambdas)).to(device)
   X = torch.tensor(np.genfromtxt(embeddingPath, delimiter=',', dtype='float64'), device=device)
   Fe =  torch.tensor(np.genfromtxt(dataPath, delimiter=',', skip_header=1, dtype='float64'), device=device)
+  nFeatures = torch.tensor(Fe.shape[1], device=device)
 
   ##############################################
   #### Run BIOT for different lambda values ####
@@ -86,10 +86,9 @@ def main(
       # Data pre-processing
       Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds[foldIdx])
 
-      # Normalize lambda
-      lam_norm = lam / torch.sqrt(Fe_norm.shape[1])
+      # Normalize lambda;'
+      lam_norm = lam / torch.sqrt(nFeatures)
 
-      print("\t\tRunning BIOT on fold data...")
       # Get rotation matrix and weights
       R, W, crit, iter, r2 = RunBIOT(X = X_norm, 
                    Fe = Fe_norm,
@@ -110,7 +109,16 @@ def main(
   
   print("\nFinished running BIOT on fold data with different lambda values!")
 
-  
+  import csv
+
+  # File path to save the CSV
+  file_path = "data.csv"
+
+  # Writing the data to a CSV file
+  with open(file_path, mode='w', newline='') as file:
+      writer = csv.writer(file)
+      writer.writerows(results)
+
   ####################################
   #### Now choose the best lambda ####
   ####################################
@@ -121,8 +129,8 @@ def main(
   lam_avg_mse = torch.zeros(len(results), device=device)
   for i, fold_results in enumerate(results):
     mse = torch.tensor([fold[2] for fold in fold_results], device=device)
-    avg = mse.mean() # removes the scalar value from the calculated vector ?
-    lam_avg_mse[i] = avg
+    fold_avg = mse.mean() # removes the scalar value from the calculated vector ?
+    lam_avg_mse[i] = fold_avg
   
   # Find the lambda with the smallest average MSE
   lam_best = lam_min_mse_idx = torch.argmin(lam_avg_mse).item()
@@ -166,7 +174,7 @@ def main(
   np.savetxt(f"{outPath}/R2.csv", r2, delimiter=",")
 
   # Output centered and scaled X
-  scaledX = {'Scaled Mx': (X - X.mean(axis=0)) / X.std(axis=0, ddof=1)}
+  scaledX = X - torch.mean(X, dim=0)
   np.savetxt(f"{outPath}/ScaledX.csv", scaledX, delimiter=",")
 
   # Output the rotated mx
@@ -175,7 +183,7 @@ def main(
   np.savetxt(f"{outPath}/Rotation.csv", R, delimiter=",")
 
   # Output centered and scaled Features
-  scaledFe = (Fe - Fe.mean(axis=0)) / Fe.std(axis=0, ddof=1)
+  scaledFe = (Fe - torch.mean(Fe, dim=0)) / torch.std(Fe, dim=0)
   np.savetxt(f"{outPath}/scaledFeatures.csv", scaledFe, delimiter=",")
 
   # Calculate and save correlations
