@@ -180,7 +180,7 @@ def main(
   # Output the rotated mx
   RMatrix = scaledX @ R
   np.savetxt(f"{outPath}/rMatrix.csv", RMatrix.cpu().numpy(), delimiter=",")
-  np.savetxt(f"{outPath}/Rotation.csv", R, delimiter=",")
+  np.savetxt(f"{outPath}/Rotation.csv", R.cpu().numpy(), delimiter=",")
 
   # Output centered and scaled Features
   scaledFe = (Fe - torch.mean(Fe, dim=0)) / torch.std(Fe, dim=0)
