@@ -1,7 +1,7 @@
 import PyFunctions.get_W_Lasso as getW
 import torch
 
-def RunBIOT(X, Fe, lam, maxIter = 200, eps = 1e-6, rotation = False, device='cpu'):
+def RunBIOT(X, Fe, lam, maxIter = 2, eps = 1e-6, rotation = False, device='cpu'):
   '''
   X: embedding matrix (response)
   Fe: external feature matrix (predictors)
@@ -12,7 +12,10 @@ def RunBIOT(X, Fe, lam, maxIter = 200, eps = 1e-6, rotation = False, device='cpu
   '''
 
   # Store all variables in the appropriate device memory, ideally, GPU if available.
-  W, r2 = getW.Lasso(Fe, X, lam, device=device)
+  # W, r2 = getW.Lasso(Fe, X, lam, device=device)
+  W = torch.ones((21, 384), dtype=torch.float64, device=device)
+  r2 = torch.ones((384, 1), dtype=torch.float64, device=device)
+
   n = Fe.shape[0]
 
   diff = 1
@@ -38,7 +41,9 @@ def RunBIOT(X, Fe, lam, maxIter = 200, eps = 1e-6, rotation = False, device='cpu
       R = u @ v.t()
     
     # Find the new weights and r^2 
-    W, r2 = getW.Lasso(Fe, X@R, lam, device=device)
+    # W, r2 = getW.Lasso(Fe, X@R, lam, device=device)
+    W = torch.ones((21, 384), dtype=torch.float64, device=device)
+    r2 = torch.ones((384, 1), dtype=torch.float64, device=device)
 
     # Find the difference between the critical values of the current and previous iteration.
     # We will stop iterating once this difference is less than epsilon.
@@ -100,8 +105,8 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}\n")
     home = ""
-    X = torch.tensor(np.genfromtxt(home + "X_norm_r.csv", delimiter=',', dtype='float64'))
-    Fe = torch.tensor(np.genfromtxt(home + "Fe_norm_r.csv", delimiter=',', dtype='float64'))        
+    X = torch.tensor(np.genfromtxt(home + "X_norm_r.csv", delimiter=',', dtype='float64'), device=device)
+    Fe = torch.tensor(np.genfromtxt(home + "Fe_norm_r.csv", delimiter=',', dtype='float64'), device=device)        
     lam = torch.tensor([0.0001], dtype=torch.float64, device=device)
     
     def testing():
@@ -114,6 +119,7 @@ if __name__ == "__main__":
             R, W, crit, iter, r2 = RunBIOT(X, Fe,  lam, rotation=True, device=device)
 
             times.append(time.time() - s)
+            print(times[i])
         np.savetxt(f"run_BIOT_times_py.csv", times, delimiter=",")
         print(f"Iter: {iter}\n")
 

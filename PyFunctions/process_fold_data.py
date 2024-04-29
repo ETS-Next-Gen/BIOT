@@ -58,3 +58,86 @@ def ProcessFoldData(X, Fe, testId, which_dummy = None, device='cpu'):
   
   return ( Fe_norm, X_norm, Fe_test, X_test ) 
 
+
+# TESTING
+if __name__ == "__main__":
+
+  import time
+  import numpy as np
+  import matplotlib.pyplot as plt
+  from guppy import hpy; h=hpy()
+
+  # def comparing(Fe_norm, X_norm, Fe_test, X_test):
+
+    # Fe_norm_r = np.loadtxt('Fe_norm_r.csv', delimiter=',', skiprows=1)
+    # X_norm_r = np.loadtxt('X_norm_r.csv', delimiter=',', skiprows=1)
+    # Fe_test_r = np.loadtxt('Fe_test_r.csv', delimiter=',', skiprows=1)
+    # X_test_r = np.loadtxt('X_test_r.csv', delimiter=',', skiprows=1)
+
+    # # Calculate differences
+    # Fe_norm_diff = abs((Fe_norm_r - Fe_norm.numpy()) / Fe_norm_r)
+    # X_norm_diff = abs((X_norm_r - X_norm.numpy()) / X_norm_r)
+    # Fe_test_diff = abs((Fe_test_r - Fe_test.numpy()) /  Fe_test_r)
+    # X_test_diff = abs((X_test_r - X_test.numpy()) /  X_test_r)
+
+    # plt.hist(Fe_norm_diff, bins=30, edgecolor='black', density=True)
+    # plt.title('Distribution Histogram')
+    # plt.xlabel('Value')
+    # plt.ylabel('Frequency')
+    # plt.grid(True)
+    # plt.show()
+
+    # print(Fe_norm_diff[abs(Fe_norm_diff) > 1e-15])
+    # print(np.mean(Fe_norm_diff))
+    # print(np.min(Fe_norm_diff))
+    # print(np.max(Fe_norm_diff))
+
+    # print(np.mean(X_norm_diff))
+    # print(np.min(X_norm_diff))
+    # print(np.max(X_norm_diff))
+
+    # print(np.mean(Fe_test_diff))
+    # print(np.min(Fe_test_diff))
+    # print(np.max(Fe_test_diff))
+
+    # print(np.mean(X_test_diff))
+    # print(np.min(X_test_diff))
+    # print(np.max(X_test_diff))
+
+  def testing():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}\n")
+
+    home = "Datasets/"
+    X = torch.tensor(np.genfromtxt(home + "embedding.csv", delimiter=',', dtype='float64'), device=device)
+    Fe =  torch.tensor(np.genfromtxt(home + "dataset.csv", delimiter=',', skip_header=1, dtype='float64'), device=device)
+    # foldIds = torch.split(torch.randperm(Fe.size(0)), Fe.size(0) // 10)
+    foldIds = torch.tensor([28, 12, 20], device=device)
+
+    heap_status1 = h.heap()
+
+    Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds, device=device)
+    # comparing(Fe_norm, X_norm, Fe_test, X_test)
+    # quit()
+
+    heap_status2 = h.heap()
+    print(f"Mem: {heap_status2.size - heap_status1.size}")
+
+    K = 30
+    times = []
+    for i in range(0, K):
+      s = time.time()
+
+      Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds, device=device)
+
+      elapsed = time.time() - s
+
+      times.append(elapsed)
+      print(elapsed)
+
+    print(Fe_norm)
+    print(X_norm)
+    print(Fe_test)
+    print(X_test)
+
+  testing()

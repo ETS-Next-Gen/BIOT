@@ -10,6 +10,7 @@ from PyFunctions.process_fold_data import ProcessFoldData
 from PyFunctions.run_BIOT import RunBIOT
 from PyFunctions.get_MSE_pred import GetMSEPred
 
+
 # DEFAULT FILE PATHS
 # NOTE: this code assumes that the first line in the DatasetPath file is a header to skip.
 FunctionPath = "PyFunctions/"
@@ -19,10 +20,10 @@ OutPath = "Results/"
 
 # DEFAULT VARIABLE VALUES
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")     # checks for gpu
-Nlambdas = 1
+Nlambdas = 5
 MinLambda = .0001
 MaxLambda = 3.5 
-K = 2            # no of folds used for cross validation
+K = 3            # no of folds used for cross validation
 sigThresh = .05   # sigma threshold ?
 
 # HELPER FUNCTION
@@ -58,9 +59,10 @@ def main(
   
   # Define lambda vector, feature vector, and embedding vector
   lambdaVals = torch.exp(torch.linspace(np.log(minLambda), np.log(maxLambda), nLambdas)).to(device)
+  # print(lambdaVals)
   X = torch.tensor(np.genfromtxt(embeddingPath, delimiter=',', dtype='float64'), device=device)
   Fe =  torch.tensor(np.genfromtxt(dataPath, delimiter=',', skip_header=1, dtype='float64'), device=device)
-  nFeatures = torch.tensor(Fe.shape[1], device=device)
+  nFoldFeatures = torch.tensor(Fe.shape[1] - K, device=device)
 
   ##############################################
   #### Run BIOT for different lambda values ####
@@ -87,7 +89,7 @@ def main(
       Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds[foldIdx])
 
       # Normalize lambda;'
-      lam_norm = lam / torch.sqrt(nFeatures)
+      lam_norm = lam / torch.sqrt(nFoldFeatures)
 
       # Get rotation matrix and weights
       R, W, crit, iter, r2 = RunBIOT(X = X_norm, 
@@ -109,19 +111,10 @@ def main(
   
   print("\nFinished running BIOT on fold data with different lambda values!")
 
-  import csv
-
-  # File path to save the CSV
-  file_path = "data.csv"
-
-  # Writing the data to a CSV file
-  with open(file_path, mode='w', newline='') as file:
-      writer = csv.writer(file)
-      writer.writerows(results)
-
   ####################################
   #### Now choose the best lambda ####
   ####################################
+
     
   print("\nNow calculating the best lambda...")
 
@@ -131,11 +124,11 @@ def main(
     mse = torch.tensor([fold[2] for fold in fold_results], device=device)
     fold_avg = mse.mean() # removes the scalar value from the calculated vector ?
     lam_avg_mse[i] = fold_avg
+  print(lam_avg_mse)
   
   # Find the lambda with the smallest average MSE
   lam_best = lam_min_mse_idx = torch.argmin(lam_avg_mse).item()
-  lam_min_mse = lambdaVals[lam_min_mse_idx]
-  print(f"\nLAMBDA WITH SMALLEST AVG MSE: {lam_min_mse}")
+  print(f"\nLAMBDA WITH SMALLEST AVG MSE: {lambdaVals[lam_min_mse_idx]}")
 
   mse_min = torch.tensor([fold[2] for fold in results[lam_min_mse_idx]], device=device)
   test_idx = lam_min_mse_idx + 1
@@ -162,10 +155,17 @@ def main(
   ################################################################
   #### Now run BIOT with the best lambda on the whole dataset ####
   ################################################################
+  
+  # Normalize entire dataset
+  Fe_mean = torch.mean(Fe, dim=0)
+  Fe_sd = torch.std(Fe, dim=0)
+  X_mean = torch.mean(X, dim=0)
+  Fe_norm = (Fe - Fe_mean) / Fe_sd
+  X_norm = X - X_mean
 
   R, W, crit, iter, r2 = RunBIOT(X = X_norm, 
                    Fe = Fe_norm,
-                   lam = lam_norm, rotation=True)
+                   lam = lambdaVals[lam_best], rotation=True)
 
   # Save regression weights to a CSV file
   np.savetxt(f"{outPath}/Weights.csv", W, delimiter=",")
@@ -200,7 +200,7 @@ def main(
 
 
 ####################################
-#### Run MAIN                   ####
+####          Run MAIN          ####
 ####################################
   
 if __name__ == "__main__":
@@ -222,11 +222,27 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   # run main!
-  main(
-    args.dataPath,
-    args.embeddingPath,
-    args.outPath,
-    args.nlambdas,
-    args.minLambda,
-    args.maxLambda
-  )
+  import time
+  iter = 30
+  times = []
+  for i in range(iter):
+
+    s = time.time()
+
+    main(
+      args.dataPath,
+      args.embeddingPath,
+      args.outPath,
+      args.nlambdas,
+      args.minLambda,
+      args.maxLambda
+    )
+
+    print(time.time() - s)
+    times.append(time.time() - s)
+
+  np.savetxt(f"BIOT_times.csv", times, delimiter=",")
+
+  
+  
+
