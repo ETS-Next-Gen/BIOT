@@ -62,7 +62,7 @@ def main(
   # print(lambdaVals)
   X = torch.tensor(np.genfromtxt(embeddingPath, delimiter=',', dtype='float64'), device=device)
   Fe =  torch.tensor(np.genfromtxt(dataPath, delimiter=',', skip_header=1, dtype='float64'), device=device)
-  nFoldFeatures = torch.tensor(Fe.shape[1] - K, device=device)
+  nFoldCols = torch.tensor(Fe.shape[1], device=device)
 
   ##############################################
   #### Run BIOT for different lambda values ####
@@ -88,12 +88,12 @@ def main(
       # Data pre-processing
       Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds[foldIdx])
 
-      # Normalize lambda;'
-      lam_norm = lam / torch.sqrt(nFoldFeatures)
+      # Normalize lambda
+      lam_norm = lam / torch.sqrt(nFoldCols)
 
       # Get rotation matrix and weights
       R, W, crit, iter, r2 = RunBIOT(X = X_norm, 
-                   Fe = Fe_norm,
+                   Fe = Fe_norm, device=device,
                    lam = lam_norm, maxIter=2, rotation=True)
       
       # Evaluate results
@@ -164,39 +164,39 @@ def main(
   X_norm = X - X_mean
 
   R, W, crit, iter, r2 = RunBIOT(X = X_norm, 
-                   Fe = Fe_norm,
+                   Fe = Fe_norm, device=device,
                    lam = lambdaVals[lam_best], rotation=True)
 
   # Save regression weights to a CSV file
-  np.savetxt(f"{outPath}/Weights.csv", W, delimiter=",")
+  np.savetxt(f"{outPath}/Weights.csv", W.cpu.numpy(), delimiter=",")
 
   # Save R-squared to a separate CSV file
-  np.savetxt(f"{outPath}/R2.csv", r2, delimiter=",")
+  np.savetxt(f"{outPath}/R2.csv", r2.cpu().numpy(), delimiter=",")
 
   # Output centered and scaled X
-  scaledX = X - torch.mean(X, dim=0)
+  scaledX = X - torch.mean(X.cpu().numpy(), dim=0)
   np.savetxt(f"{outPath}/ScaledX.csv", scaledX, delimiter=",")
 
   # Output the rotated mx
   RMatrix = scaledX @ R
-  np.savetxt(f"{outPath}/rMatrix.csv", RMatrix, delimiter=",")
+  np.savetxt(f"{outPath}/rMatrix.csv", RMatrix.cpu().numpy(), delimiter=",")
   np.savetxt(f"{outPath}/Rotation.csv", R, delimiter=",")
 
   # Output centered and scaled Features
   scaledFe = (Fe - torch.mean(Fe, dim=0)) / torch.std(Fe, dim=0)
-  np.savetxt(f"{outPath}/scaledFeatures.csv", scaledFe, delimiter=",")
+  np.savetxt(f"{outPath}/scaledFeatures.csv", scaledFe.cpu().numpy(), delimiter=",")
 
   # Calculate and save correlations
-  cors = np.corrcoef(RMatrix, scaledFe, rowvar=False)
+  cors = np.corrcoef(RMatrix.cpu().numpy(), scaledFe.cpu().numpy(), rowvar=False)
   np.savetxt(f"{outPath}/Cors.csv", cors, delimiter=",")
 
   # Combine matrices and save
-  combined = np.column_stack((RMatrix, scaledFe))
+  combined = np.column_stack((RMatrix.cpu().numpy(), scaledFe.cpu().numpy()))
   np.savetxt(f"{outPath}/combined.csv", combined, delimiter=",")
 
   # Calculate and save projection matrix
   WMatrix = scaledFe @ W
-  np.savetxt(f"{outPath}/pMatrix.csv", WMatrix, delimiter=",")
+  np.savetxt(f"{outPath}/pMatrix.csv", WMatrix.cpu().numpy(), delimiter=",")
 
 
 ####################################
