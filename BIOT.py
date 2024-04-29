@@ -168,14 +168,14 @@ def main(
                    lam = lambdaVals[lam_best], rotation=True)
 
   # Save regression weights to a CSV file
-  np.savetxt(f"{outPath}/Weights.csv", W.cpu.numpy(), delimiter=",")
+  np.savetxt(f"{outPath}/Weights.csv", W.cpu().numpy(), delimiter=",")
 
   # Save R-squared to a separate CSV file
   np.savetxt(f"{outPath}/R2.csv", r2.cpu().numpy(), delimiter=",")
 
   # Output centered and scaled X
-  scaledX = X - torch.mean(X.cpu().numpy(), dim=0)
-  np.savetxt(f"{outPath}/ScaledX.csv", scaledX, delimiter=",")
+  scaledX = X - torch.mean(X, dim=0)
+  np.savetxt(f"{outPath}/ScaledX.csv", scaledX.cpu().numpy(), delimiter=",")
 
   # Output the rotated mx
   RMatrix = scaledX @ R
