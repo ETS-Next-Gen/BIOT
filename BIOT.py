@@ -68,7 +68,7 @@ def main(
   #### Run BIOT for different lambda values ####
   ##############################################
 
-  print("Selection of lambda in progress...")
+  # print("Selection of lambda in progress...")
 
   # Set seed for random generation of data folds, then generate fold IDs
   foldIds = torch.split(torch.randperm(Fe.size(0)), Fe.size(0) // K)
@@ -78,12 +78,12 @@ def main(
   for lam in lambdaVals:
   
     # Select lambda value 
-    print('Processing lambda: ', lam)
+    # print('Processing lambda: ', lam)
 
     # Cross validation!
     fold_results = []
     for foldIdx in range(0, K):
-      print('\tProcessing fold index ', foldIdx)
+      # print('\tProcessing fold index ', foldIdx)
 
       # Data pre-processing
       Fe_norm, X_norm, Fe_test, X_test = ProcessFoldData(X = X, Fe = Fe, testId = foldIds[foldIdx])
@@ -109,14 +109,14 @@ def main(
     # Add output to final results
     results.append(fold_results)
   
-  print("\nFinished running BIOT on fold data with different lambda values!")
+  # print("\nFinished running BIOT on fold data with different lambda values!")
 
   ####################################
   #### Now choose the best lambda ####
   ####################################
 
     
-  print("\nNow calculating the best lambda...")
+  # print("\nNow calculating the best lambda...")
 
   # Calculate all of the average MSEs for each lambda across all folds of data
   lam_avg_mse = torch.zeros(len(results), device=device)
@@ -124,11 +124,11 @@ def main(
     mse = torch.tensor([fold[2] for fold in fold_results], device=device)
     fold_avg = mse.mean() # removes the scalar value from the calculated vector ?
     lam_avg_mse[i] = fold_avg
-  print(lam_avg_mse)
+  # print(lam_avg_mse)
   
   # Find the lambda with the smallest average MSE
   lam_best = lam_min_mse_idx = torch.argmin(lam_avg_mse).item()
-  print(f"\nLAMBDA WITH SMALLEST AVG MSE: {lambdaVals[lam_min_mse_idx]}")
+  # print(f"\nLAMBDA WITH SMALLEST AVG MSE: {lambdaVals[lam_min_mse_idx]}")
 
   mse_min = torch.tensor([fold[2] for fold in results[lam_min_mse_idx]], device=device)
   test_idx = lam_min_mse_idx + 1
@@ -149,7 +149,7 @@ def main(
 
     test_idx += 1
 
-  print(f"The most sparse lambda that is not significantly different from the best lambda is {lambdaVals[lam_best]} at index {lam_best}")
+  # print(f"The most sparse lambda that is not significantly different from the best lambda is {lambdaVals[lam_best]} at index {lam_best}")
 
 
   ################################################################
