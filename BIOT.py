@@ -242,7 +242,3 @@ if __name__ == "__main__":
     times.append(time.time() - s)
 
   np.savetxt(f"BIOT_times.csv", times, delimiter=",")
-
-  
-  
-

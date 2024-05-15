@@ -4,7 +4,7 @@ GetMSEPred <- function(Fe, X, R, W) {
   # R: orthogonal transformation matrix
   # W: regression weights
   
+  # Return MSE
   (1/(2*nrow(X)*ncol(X)))*sum((X%*%R - as.matrix(Fe)%*%W)^2)
   
 }
- 

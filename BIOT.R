@@ -4,12 +4,21 @@
 
 rm(list = ls())
 
+if(system.file(package='glmnet') == FALSE) {
+  install.packages("glmnet", repos = "http://cran.us.r-project.org")
+}
+if(system.file(package='exactRankTests') == FALSE) {
+  install.packages("exactRankTests", repos = "http://cran.us.r-project.org")
+}
+
 library(glmnet) # Lasso
 library(exactRankTests) # Wilcoxon test
 
+s <- Sys.time()
+
 # File paths 
 data.path <- "Datasets/"
-out.path <- "Results/result.RData"
+out.path <- "Results/"
 function.path <- "Functions/"
 
 args <- commandArgs(TRUE)
@@ -18,8 +27,9 @@ args <- commandArgs(TRUE)
 source.files <- list.files(path = function.path, recursive = TRUE)
 invisible(sapply(source.files, function(x) source(file = paste0(function.path, x))))
 
-nlambdas = 10
-nfolds = 10 
+# Default variable values
+nlambdas = 5
+nfolds = 3
 maxLambda = 3.5 
 sigThresh = .05
 
@@ -65,11 +75,12 @@ print("Selection of lambda in progress...")
 seed <- 155000
 set.seed(seed)
 # Eval results for each lambda in lambda.vals stored in df eval.res.lambda
- eval.res.lambda <- do.call(rbind, 
+eval.res.lambda <- do.call(rbind, 
                            lapply(1:length(lambda.vals), function(lambda.vals.index) {
                              
   lambda <- lambda.vals[lambda.vals.index]
-  print(paste('Processing lambda index ', lambda.vals.index))
+  print(paste('Processing lambda ', lambda))
+
   # Split data row indexes randomly into K folds
   K <- nfolds # number of folds for K-fold cross-validation
   fold.ids <- suppressWarnings(split(sample(nrow(Fe)), seq(1, nrow(Fe), length = K)))
@@ -82,13 +93,14 @@ set.seed(seed)
     
     # normalize lambda
     lambda.norm <- lambda/sqrt(ncol(fold.data$Fe.norm))
+
     # Get rotation matrix and weights
     res <- RunBIOT(X = fold.data$X.norm, 
-                   Fe = fold.data$Fe.norm,
-                   lambda = lambda.norm, rotation=T)
+                  Fe = fold.data$Fe.norm,
+                  lambda = lambda.norm, rotation=T)
     R <- res$R
     W <- res$W
-    print(res$R_squared)
+    # print(res$R_squared)
     #print(res$W)
 
     # Eval
@@ -96,12 +108,11 @@ set.seed(seed)
                 W = W, 
                 Fe.test = fold.data$Fe.test,
                 X.test = fold.data$X.test)
-    
+
     if (!is.na(tmp$MSE)) eval.res.K[[index.fold]] <- cbind.data.frame(lambda = lambda,lambda.norm = lambda.norm,tmp)
   }
   return(do.call(rbind.data.frame, eval.res.K))
 }))
-
 
 ####################################
 #### Now choose the best lambda ####
@@ -154,6 +165,7 @@ print(paste0("The most sparse lambda that is not significantly different from th
 ################################################################
 #### Now run BIOT with the best lambda on the whole dataset ####
 ################################################################
+
 # Some elements of Fe can have a standard deviation (sd) equal to 0, which is an issue when scaling.
 # In order to avoid this problem, the sd for these columns is set to 1.
 Fe.sd <- apply(Fe, 2, sd)
@@ -170,21 +182,29 @@ res <- RunBIOT(X = scale(X, center=T, scale=F),
 W_R_squared <- list(W = res$W, R_squared = res$R_squared)
 save(W_R_squared, file = paste(out.path, 'RData.csv'))
 write.csv(res$R_squared,file=paste(out.path, 'RSquared.csv'))
-print(paste0("Final weights and Rsq stored in ", paste(out.path, 'RData.csv'), ". R object is called W_R_squared."))
-show(W_R_squared)
+# print(paste0("Final weights and Rsq stored in ", paste(out.path, 'RData.csv'), ". R object is called W_R_squared."))
+# show(W_R_squared)
 
 # Output the rotated matrix
-scaledX = scale(X, center=T, scale=F)
+scaledX <- scale(X, center=T, scale=F)
 write.csv(scaledX, file=paste(out.path, 'scaledX.csv'), row.names=FALSE)
+
 RMatrix = data.matrix(scaledX) %*% data.matrix(res$R)
 write.csv(RMatrix, file = paste(out.path, 'rMatrix.csv'), row.names=FALSE)
 write.csv(res$R, file=paste(out.path, 'rotation.csv'), row.names=FALSE)
+
 FeX = scale(Fe, center=T, scale=Fe.sd)
 write.csv(FeX, file=paste(out.path, 'features.csv'), row.names=FALSE)
+
 cors = cor(RMatrix, FeX)
 write.csv(cors, file = paste(out.path, 'cors.csv'), row.names=TRUE, col.names=TRUE)
+
 combined = cbind(RMatrix, FeX)
 write.csv(combined, file=paste(out.path, 'combined.csv'), row.names=TRUE)
+
 WMatrix = data.matrix(FeX) %*% data.matrix(res$W)
 write.csv(WMatrix, file=paste(out.path, 'pMatrix.csv'), row.names=FALSE)
 write.csv(res$W, file=paste(out.path, 'weights.csv'))
+
+elapsed <- Sys.time() - s
+print(cat(elapsed,"\n"))
