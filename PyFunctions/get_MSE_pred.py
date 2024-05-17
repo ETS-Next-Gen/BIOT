@@ -11,6 +11,4 @@ def GetMSEPred(
 
     Returns the MSE
     """
-    nrow, ncol = X.shape
-
-    return (1 / (2 * nrow * ncol)) * torch.sum((X @ R - Fe @ W)**2)
+    return (1 / (2 * torch.numel(X))) * torch.sum((X @ R - Fe @ W)**2)
