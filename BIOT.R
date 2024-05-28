@@ -5,10 +5,10 @@
 rm(list = ls())
 
 # Download the required libraries
-if !system.file(package='glmnet') {
+if system.file(package='glmnet') == "" {
   install.packages('glmnet')
 }
-if !system.file(package='exactRankTests') {
+if system.file(package='exactRankTests') == "" {
   install.packages('exactRankTests')
 }
 library(glmnet) # Lasso
