@@ -43,37 +43,28 @@ ProcessFoldData <- function(X, Fe, test.id, which.dummy = rep(c(F), ncol(Fe))){
 }
 
 
-# # TESTING
-# # install.packages("https://cran.r-project.org/bin/macosx/big-sur-x86_64/contrib/4.3/profmem_0.6.0.tgz", repos=NULL)
-# # library("profmem")
-# # options(profmem.threshold = 2000)
+# TESTING
+# install.packages("https://cran.r-project.org/bin/macosx/big-sur-x86_64/contrib/4.3/profmem_0.6.0.tgz", repos=NULL)
+# library("profmem")
+# options(profmem.threshold = 2000)
 
-# X <- read.csv(paste0("Datasets/embedding.csv"), header=F)
-# Fe <- read.csv(paste0("Datasets/dataset.csv"))
-# # seed <- 155000
-# # set.seed(seed)
-# # fold.ids <- suppressWarnings(split(sample(nrow(Fe)), seq(1, nrow(Fe), length = 10)))
+X <- read.csv(paste0("Datasets/embedding.csv"))
+Fe <- read.csv(paste0("Datasets/dataset.csv"))
+fold.ids <- c(29, 13, 21)
 
-# fold.ids <- c(29, 13, 21)
-# # fold.data <- ProcessFoldData(X = X, Fe = Fe, test.id = fold.ids)
-# # write.csv(fold.data$Fe.norm, file = "Fe_norm_r.csv", row.names = FALSE)
-# # write.csv(fold.data$X.norm, file = "X_norm_r.csv", row.names = FALSE)
-# # write.csv(fold.data$Fe.test, file = "Fe_test_r.csv", row.names = FALSE)
-# # write.csv(fold.data$X.test, file = "X_test_r.csv", row.names = FALSE)
+K <- 30
+times <- list()
+for (i in 1:K) {
+  s <- Sys.time()
 
-# K <- 30
-# times <- list()
-# for (i in 1:K) {
-#   s <- Sys.time()
+  fold.data <- ProcessFoldData(X = X, Fe = Fe, test.id = fold.ids[[1]])
 
-#   fold.data <- ProcessFoldData(X = X, Fe = Fe, test.id = fold.ids[[1]])
+  elapsed <- Sys.time() - s
 
-#   elapsed <- Sys.time() - s
+  times[[i]] <- cat(elapsed,"\n")
+}
 
-#   times[[i]] <- cat(elapsed,"\n")
-# }
-
-# # p <- profmem({
-# #   fold.data <- ProcessFoldData(X = X, Fe = Fe, test.id = fold.ids[[1]])
-# # })
-# # print(total(p))
+write.csv(fold.data$Fe.norm, file = "Fe_norm_r.csv", row.names = FALSE)
+write.csv(fold.data$X.norm, file = "X_norm_r.csv", row.names = FALSE)
+write.csv(fold.data$Fe.test, file = "Fe_test_r.csv", row.names = FALSE)
+write.csv(fold.data$X.test, file = "X_test_r.csv", row.names = FALSE)
