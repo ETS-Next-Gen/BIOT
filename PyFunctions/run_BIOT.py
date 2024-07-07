@@ -104,8 +104,8 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}\n")
     home = ""
-    X = torch.tensor(np.genfromtxt(home + "X_norm_r.csv", delimiter=',', skip_header=1, dtype=torch.float64), device=device)
-    Fe = torch.tensor(np.genfromtxt(home + "Fe_norm_r.csv", delimiter=',', skip_header=1, dtype=torch.float64), device=device)        
+    X = torch.tensor(np.genfromtxt(home + "X_norm_r.csv", delimiter=',', skip_header=1, dtype='float64'), device=device)
+    Fe = torch.tensor(np.genfromtxt(home + "Fe_norm_r.csv", delimiter=',', skip_header=1, dtype='float64'), device=device)        
     lam = torch.tensor([0.0001], dtype=torch.float64, device=device)
     
     def testing():
