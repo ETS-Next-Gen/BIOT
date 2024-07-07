@@ -1,4 +1,3 @@
-import PyFunctions.get_W_Lasso as getW
 import torch
 
 def RunBIOT(X, Fe, lam, maxIter = 2, eps = 1e-6, rotation = False, device='cpu'):
@@ -12,12 +11,10 @@ def RunBIOT(X, Fe, lam, maxIter = 2, eps = 1e-6, rotation = False, device='cpu')
   '''
 
   # Store all variables in the appropriate device memory, ideally, GPU if available.
-  # W, r2 = getW.Lasso(Fe, X, lam, device=device)
   W = torch.ones((21, 384), dtype=torch.float64, device=device)
   r2 = torch.ones((384, 1), dtype=torch.float64, device=device)
 
   n = Fe.shape[0]
-
   diff = 1
   iter = 0
   crit = []
@@ -41,9 +38,7 @@ def RunBIOT(X, Fe, lam, maxIter = 2, eps = 1e-6, rotation = False, device='cpu')
       R = u @ v.t()
     
     # Find the new weights and r^2 
-    # W, r2 = getW.Lasso(Fe, X@R, lam, device=device)
-    W = torch.ones((21, 384), dtype=torch.float64, device=device)
-    r2 = torch.ones((384, 1), dtype=torch.float64, device=device)
+    # W = torch.ones((21, 384), dtype=torch.float64, device=device)
 
     # Find the difference between the critical values of the current and previous iteration.
     # We will stop iterating once this difference is less than epsilon.
@@ -100,7 +95,6 @@ def BIOTCrit(Fe, X, R, W, lam):
 if __name__ == "__main__":
     import numpy as np
     import time
-    import tracemalloc
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}\n")
@@ -111,38 +105,18 @@ if __name__ == "__main__":
     
     def testing():
         K = 30
-        times = []
         for i in range(K):
 
             s = time.time()
 
             R, W, crit, iter, r2 = RunBIOT(X, Fe,  lam, rotation=True, device=device)
 
-            times.append(time.time() - s)
-            print(times[i])
-        np.savetxt(f"run_BIOT_times_py.csv", times, delimiter=",")
-        print(f"Iter: {iter}\n")
+            print(time.time() - s)
 
-        np.savetxt("R_py.csv", R, delimiter=",")
+        print(f"Iter: {iter}\n")
+        np.savetxt("Rmx_py.csv", R, delimiter=",")
         np.savetxt("W_py.csv", W, delimiter=",")
         np.savetxt("crit_py.csv", crit, delimiter=",")
         np.savetxt("r2_py.csv", r2, delimiter=",")
 
-
-    def memtrace():
-        tracemalloc.start()
-        snapshot_before = tracemalloc.take_snapshot()
-
-        R, W, crit, iter, r2 = RunBIOT(X, Fe,  lam, rotation=True, device=device)
-
-        snapshot_after = tracemalloc.take_snapshot()
-
-        difference = snapshot_after.compare_to(snapshot_before, 'lineno')
-        mems = []
-        for stat in difference:
-            mems.append(stat)
-        print(difference)
-        np.savetxt(f"run_BIOT_mems_py.csv", mems, delimiter=",")
-
     testing()
-    memtrace()

@@ -7,9 +7,8 @@ RunBIOT <- function(X, Fe, lambda, max.iter = 2, eps = 1e-6, rotation = F){
   # rotation: should the orthogonal matrix be a rotation matrix? Yes = T, No = F
 
   Fe <- as.matrix(Fe)
-  # Lasso.sol <- GetWLasso(X = Fe, Y = X, lambda = lambda)
-  # W <- Lasso.sol$W
   W <- matrix(1, nrow = ncol(Fe), ncol = ncol(X))
+  R_squared <- matrix(1, nrow = ncol(X), ncol = 1)
   diff <- Inf
   iter <- 1
   crit <- list(Inf)
@@ -21,8 +20,6 @@ RunBIOT <- function(X, Fe, lambda, max.iter = 2, eps = 1e-6, rotation = F){
     # write.csv(decomp$u, file = "R_u.csv", row.names = FALSE)
     # write.csv(decomp$d, file = "R_d.csv", row.names = FALSE)
     # write.csv(decomp$v, file = "R_v.csv", row.names = FALSE)
-    # 35
-    # print(which.min(decomp$d))
     
     if (rotation == T){ # If rotation matrix is desired
       
@@ -38,11 +35,8 @@ RunBIOT <- function(X, Fe, lambda, max.iter = 2, eps = 1e-6, rotation = F){
       
     }
     
-    # Lasso.sol <- GetWLasso(X = Fe, Y = X%*%R, lambda = lambda)
-    # W <- Lasso.sol$W
-    # R_squared <- Lasso.sol$R_squared
-    W <- matrix(1, nrow = ncol(Fe), ncol = ncol(X))
-    R_squared <- matrix(1, nrow = ncol(X), ncol = 1)
+    # W <- matrix(1, nrow = ncol(Fe), ncol = ncol(X))
+    # R_squared <- matrix(1, nrow = ncol(X), ncol = 1)
 
     
     crit[[iter + 1]] <- BIOTCrit(Fe, X, R, W, lambda)
@@ -56,83 +50,38 @@ RunBIOT <- function(X, Fe, lambda, max.iter = 2, eps = 1e-6, rotation = F){
   
 }
 
-# BIOTCrit <- function(Fe, X, R, W, lambda){
-#   # Fe: external feature matrix (predictors)
-#   # X: embedding matrix (response)
-#   # R: orthogonal transformation matrix
-#   # W: regression weights
-#   # lambda: sparsity hyperparameter
+BIOTCrit <- function(Fe, X, R, W, lambda){
+  # Fe: external feature matrix (predictors)
+  # X: embedding matrix (response)
+  # R: orthogonal transformation matrix
+  # W: regression weights
+  # lambda: sparsity hyperparameter
   
-#   (1/(2*nrow(Fe)))*sum(diag(t(X - Fe%*%W%*%t(R))%*%((X - Fe%*%W%*%t(R))))) + lambda*sum(abs(W))
-# }
-
-# GetWLasso = function(X, Y, lambda){
-#   # X: predictor matrix
-#   # Y: response matrix
-#   # lambda: Lasso hyperparameter
-  
-#   require(glmnet)
-  
-#   W <- sapply(1:(dim(Y)[2]), function(k) {
-#     glmnet(x = as.matrix(X), 
-#            y = Y[, k], 
-#            intercept = F, 
-#            lambda = c(100, lambda), 
-#            family = "gaussian", 
-#            standardize = F,
-#            maxit = 100000)$beta[, 2]})
-
-#   R_squared <- GetRSquared(X, W, Y)
-  
-#   return(list(W=W, R_squared=R_squared))
-# }
-
-# GetRSquared <- function(X, W, Y){
-#   # X: predictor matrix
-#   # W: regression weights
-#   # Y: response matrix
-  
-#   Y <- as.matrix(Y)
-#   Rsq <- sapply(1:ncol(Y), function(i){ 
-#     var.pred <- sum((as.matrix(X)%*%W[, i] - Y[, i])^2)
-#     var.y <- sum((Y[,i] - mean(Y[,i]))^2)
-#     val <- 1 - (var.pred/var.y)
-#     return(val)
-#   })
-#   return(Rsq)
-# }
+  (1/(2*nrow(Fe)))*sum(diag(t(X - Fe%*%W%*%t(R))%*%((X - Fe%*%W%*%t(R))))) + lambda*sum(abs(W))
+}
 
 # # TESTING
 
-# # Read data from CSV file
-# X <- as.matrix(read.csv("Datasets/embedding.csv", header=F))
-# Fe <- as.matrix(read.csv("Datasets/dataset.csv"))
-# X <- scale(X, center = apply(X, 2, mean))
-# Fe <- scale(Fe, center = apply(Fe, 2, mean) , scale = apply(Fe, 2, sd))
+# Read data from CSV file
+X <- as.matrix(read.csv("X_norm_r.csv"))
+Fe <- as.matrix(read.csv("Fe_norm_r.csv"))
 
-# # res <- RunBIOT(X, Fe, 0.0001, rotation = TRUE)
-# # print(res$R_squared)
 
-# K <- 30
-# tot <- 0
-# times <- list()
-# for (i in 1:K) {
-#   s <- Sys.time()
+K <- 30
+for (i in 1:K) {
+  s <- Sys.time()
 
-#   res <- RunBIOT(X, Fe, 0.0001, rotation = TRUE)
+  res <- RunBIOT(X, Fe, 0.0001, rotation = TRUE)
 
-#   elapsed <- Sys.time() - s
-#   print(elapsed)
-#   times[[i]] <- elapsed
-#   tot <- tot + elapsed
-# }
+  elapsed <- Sys.time() - s
+  print(elapsed)
+}
 
-# avg_value_R <- sum(res$R_squared) / 384
-# print(avg_value_R)
+# Print the iteration number
+cat(sprintf("Iter: %d\n", res$iter))
 
-# # for (i in 1:3) {
-# #   p <- profmem({
-# #     res <- RunBIOT(X, Fe, 0.0001, rotation = TRUE)
-# #   })
-# #   print(total(p))
-# }
+# Save the matrices to CSV files
+write.csv(res$R, "runBIOT/Rmx_R.csv", row.names = FALSE)
+write.csv(res$W, "runBIOT/W_R.csv", row.names = FALSE)
+write.csv(res$crit, "runBIOT/crit_R.csv", row.names = FALSE)
+write.csv(res$r2, "runBIOT/r2_R.csv", row.names = FALSE)
