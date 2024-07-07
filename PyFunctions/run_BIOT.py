@@ -23,7 +23,7 @@ def RunBIOT(X, Fe, lam, maxIter = 2, eps = 1e-6, rotation = False, device='cpu')
   while( iter + 1 < maxIter and diff > eps ):  
     # Perform singular value decomposition
     # u, d, v = torch.linalg.svd( (1 / (2 * n)) * X.t() @ (Fe @ W))
-    L = (1 / (2 * n)) * X.t() @ (Fe @ W)
+    L = (1 / (2 * n)) * X.T @ (Fe @ W)
     try:
       u, d, v = torch.svd(L)
     except:                     # torch.svd may have convergence issues for GPU and CPU.
@@ -104,8 +104,8 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}\n")
     home = ""
-    X = torch.tensor(np.genfromtxt(home + "X_norm_r.csv", delimiter=',', dtype='float64'), device=device)
-    Fe = torch.tensor(np.genfromtxt(home + "Fe_norm_r.csv", delimiter=',', dtype='float64'), device=device)        
+    X = torch.tensor(np.genfromtxt(home + "X_norm_r.csv", delimiter=',', skip_header=1, dtype=torch.float64), device=device)
+    Fe = torch.tensor(np.genfromtxt(home + "Fe_norm_r.csv", delimiter=',', skip_header=1, dtype=torch.float64), device=device)        
     lam = torch.tensor([0.0001], dtype=torch.float64, device=device)
     
     def testing():
