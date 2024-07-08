@@ -22,12 +22,12 @@ def RunBIOT(X, Fe, lam, maxIter = 2, eps = 1e-6, rotation = False, device='cpu')
 
   while( iter + 1 < maxIter and diff > eps ):  
     # Perform singular value decomposition
-    # u, d, v = torch.linalg.svd( (1 / (2 * n)) * X.t() @ (Fe @ W))
-    L = (1 / (2 * n)) * X.T @ (Fe @ W)
-    try:
-      u, d, v = torch.svd(L)
-    except:                     # torch.svd may have convergence issues for GPU and CPU.
-      u, d, v = torch.svd(L + 1e-4*L.mean()*torch.rand_like(L))
+    u, d, v = torch.linalg.svd( (1 / (2 * n)) * X.T @ (Fe @ W))
+    # L = (1 / (2 * n)) * X.T @ (Fe @ W)
+    # try:
+    #   u, d, v = torch.svd(L)
+    # except:                     # torch.svd may have convergence issues for GPU and CPU.
+    #   u, d, v = torch.svd(L + 1e-4*L.mean()*torch.rand_like(L))
 
     if rotation:
       # Set the smallest singular value to the sign of the determinant of U and V^T.
