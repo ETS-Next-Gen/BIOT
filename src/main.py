@@ -17,6 +17,9 @@ except: pass
 print("Default file paths:-------------")
 print(f"datasets: {datasets}")
 print(f"output: {output}")
+print("--------------------------------")
+
+
 
 # DEFAULT PARAMETERS
 nLambdas = 10
@@ -33,6 +36,8 @@ print(f"maxLambda: {maxLambda}")
 print(f"Number of folds: {K}")
 print(f"sigThresh: {sigThresh}")
 print(f"maxiter: {maxiter}")
+print("--------------------------------")
+
 
 
 # PYTORCH ENVIRONMENT VARIABLES
@@ -82,9 +87,9 @@ foldIds = torch.split(torch.randperm(Features.size(0)), Features.size(0) // K)
 results = []
 # Perform cross validation for each lambda
 for lam in lambdaVals:
-  print('Processing lambda: ', lam)
   # Normalize lambda
   lam_norm = lam.item() / np.sqrt(Features.shape[1])
+  print('Processing lambda: ', lam_norm)
 
   # Cross validation!
   fold_results = []
@@ -157,14 +162,16 @@ while test_idx < len(results):
 
   test_idx += 1
 
-print(f"The most sparse lambda that is not significantly different from the best lambda is {lambdaVals[lam_best]} at index {lam_best}")
+lam_best_norm = lambdaVals[lam_best].item() / np.sqrt(Features.shape[1])
+print(f"The most sparse lambda that is not significantly different from the best lambda is {lam_best_norm} at index {lam_best}")
 
 
 ################################################################
 #### Now run BIOT with the best lambda on the whole dataset ####
 ################################################################
 
-clf = linear_model.Lasso(alpha=lambdaVals[lam_best].item())
+
+clf = linear_model.Lasso(alpha=lam_best_norm)
 # intializing the rotation matrix
 Rotation = torch.randn(Edim, Edim, dtype=torch.float64, device=device)
 
