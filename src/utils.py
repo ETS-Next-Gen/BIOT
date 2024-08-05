@@ -10,7 +10,7 @@ def scale(X):
   return (X - np.min(X)) / np.std(X)
 
 
-def ProcessFoldData(X: torch.Tensor, Fe: torch.Tensor, testId: torch.Tensor, CV=False) -> t.Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def ProcessFoldData(X: torch.Tensor, Fe: torch.Tensor, testId: torch.Tensor, CV=False, num=10000000000) -> t.Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     X: embedding matrix (response)
     Fe: external feature matrix (predictors)
@@ -44,9 +44,10 @@ def ProcessFoldData(X: torch.Tensor, Fe: torch.Tensor, testId: torch.Tensor, CV=
     X_test = normalize(X_test, mean, std)
 
     if CV:
-      count = min(2000, Fe_train.shape[0])
-      Fe_train = Fe_train[:count,:]
-      X_train = X_train[:count,:]
+      count = min(num, Fe_train.shape[0])
+      count = torch.randperm(Fe_train.shape[0])[:count] # Get me num random samples from the training set 
+      Fe_train = Fe_train[count,:]
+      X_train = X_train[count,:]
       
       # Fe_test = Fe_test[:count,:]
       # X_test = X_test[:count,:]

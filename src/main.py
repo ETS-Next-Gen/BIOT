@@ -9,7 +9,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # DEFAULT FILE PATHS
-datasets = "../datasets/"
+# datasets = "../datasets/"
 output = "../output/"
 datasets = "../datasets/layers10_big"
 try: os.mkdir(output)
@@ -29,6 +29,10 @@ maxLambda = 3.5
 K = 10           # no of folds used for cross validation
 sigThresh = .05   # sigma threshold
 maxiter = 200
+num = 1000 # Number of training samples to use during the cross validation and testing
+# To Randomly sample training data during cross-validation step only
+CV = True
+# CV =  False 
 
 print("Default parameters:-------------")
 print(f"nLambdas: {nLambdas}")
@@ -37,6 +41,8 @@ print(f"maxLambda: {maxLambda}")
 print(f"Number of folds: {K}")
 print(f"sigThresh: {sigThresh}")
 print(f"maxiter: {maxiter}")
+print(f"num of training samples for CV: {num}")
+print(f"Randomly sample training data during cross-validation: {CV}")
 print("--------------------------------")
 
 
@@ -98,26 +104,28 @@ for li, lam in enumerate(lambdaVals):
   for foldIdx in range(0, K):
 
     clf = linear_model.Lasso(alpha=lam_norm, fit_intercept=False)
-    clf.coef_ = torch.zeros(Edim, Fdim, dtype=torch.float64, device=device)
+    clf.coef_ = torch.randn(Edim, Fdim, dtype=torch.float64, device=device)
     # preprocess embeddings and features
-    Features_norm, Embeddings_norm, Features_test, Embeddings_test = ProcessFoldData(X = Embeddings, Fe = Features, testId = foldIds[foldIdx], CV=True)
+    Features_norm, Embeddings_norm, Features_test, Embeddings_test = ProcessFoldData(X = Embeddings, Fe = Features, testId = foldIds[foldIdx], CV=CV, num=num)
 
     
     dummymse_error = 0
+    maxiter = 200
     for iter in range(maxiter):
+  
       # Rotation
-      W = torch.tensor( clf.coef_.T, device=Embeddings.device)
-      Rotation = SVD(Features, W, Embeddings)
+      W = torch.tensor( clf.coef_.T, device=Embeddings_norm.device)
+      Rotation = SVD(Features_norm, W, Embeddings_norm)
       # Lasso regression
-      Y = torch.mm(Embeddings,Rotation)
-      clf.fit(Features.cpu(),Y.cpu())
+      Y = torch.mm(Embeddings_norm,Rotation)
+      clf.fit(Features_norm.cpu(),Y.cpu())
       
       mse, reg = MSE(Embeddings_test, Features_test, Rotation, clf, lam_norm)
       mse_error = mse 
       
-      if mse_error - dummymse_error < 0.000001:
-        if maxiter >=3:
-          break
+      if mse_error - dummymse_error < 0.000001 and (iter >= 3):  
+        break
+
       dummymse_error = mse_error
     print(f"Processing fold: {foldIdx}, Iteration: {iter}, MSE: {mse}, Reg: {reg}, Total: {mse_error}")
 
@@ -175,6 +183,8 @@ while test_idx < len(results):
 
 lam_best_norm = lambdaVals[lam_best].item()
 print(f"The most sparse lambda that is not significantly different from the best lambda is {lam_best_norm} at index {lam_best}")
+with open(f"{output}/{num}_best_lambda.txt", "w") as f:
+  f.write(f"value:-{lam_best_norm}_index:-{lam_best}")
 
 
 ################################################################
@@ -191,11 +201,11 @@ Features_norm, Embeddings_norm, Features_test, Embeddings_test = ProcessFoldData
 dummymse_error = 0
 for iter in range(maxiter):
   # Rotation
-  W = torch.tensor( clf.coef_.T, device=Embeddings.device)
-  Rotation = SVD(Features, W, Embeddings)
+  W = torch.tensor( clf.coef_.T, device=Embeddings_norm.device)
+  Rotation = SVD(Features_norm, W, Embeddings_norm)
   # Lasso regression
-  Y = torch.mm(Embeddings,Rotation)
-  clf.fit(Features.cpu(),Y.cpu())
+  Y = torch.mm(Embeddings_norm,Rotation)
+  clf.fit(Features_norm.cpu(),Y.cpu())
   
   mse, reg = MSE(Embeddings_test, Features_test, Rotation, clf, lam_norm)
   mse_error = mse 
@@ -208,7 +218,7 @@ for iter in range(maxiter):
 ############################################
 #### Now Save the results to a CSV file ####
 ############################################
-W = clf.coef_.T.cpu().numpy()
+W = clf.coef_.T
 Rotation = Rotation.cpu().numpy()
 print(W, W.max(), W.min())
 print(Rotation, Rotation.max(), Rotation.min())
@@ -232,7 +242,6 @@ scaledFe = scale(Features.cpu().numpy())
 np.savetxt(f"{output}/Features.csv", scaledFe, delimiter=",")
 
 # correlation matrix
-# cors = np.corrcoef(RMatrix, scaledFe, rowvar=False)
 # Initialize a result matrix
 cor_result = np.zeros((RMatrix.shape[1], scaledFe.shape[1]))
 
