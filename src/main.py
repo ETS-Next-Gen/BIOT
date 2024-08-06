@@ -29,7 +29,7 @@ maxLambda = 3.5
 K = 10           # no of folds used for cross validation
 sigThresh = .05   # sigma threshold
 maxiter = 200
-num = 1000 # Number of training samples to use during the cross validation and testing
+num = 4000 # Number of training samples to use during the cross validation and testing
 # To Randomly sample training data during cross-validation step only
 CV = True
 # CV =  False 
