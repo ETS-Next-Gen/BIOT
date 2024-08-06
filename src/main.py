@@ -63,6 +63,8 @@ Fdim = 21
 # Loading from a file
 file = True
 if file:
+  
+  
   Embeddings = torch.tensor(np.genfromtxt(f"{datasets}/embeddings.csv", delimiter=',', dtype='float64'), device=device)
   Features =  torch.tensor(np.genfromtxt(f"{datasets}/features.csv", delimiter=',', skip_header=1, dtype='float64'), device=device)
 
@@ -73,7 +75,6 @@ else:
 
 Edim = Embeddings.shape[1] 
 Fdim = Features.shape[1] 
-
 
 
 
@@ -127,7 +128,7 @@ for li, lam in enumerate(lambdaVals):
         break
 
       dummymse_error = mse_error
-    print(f"Processing fold: {foldIdx}, Iteration: {iter}, MSE: {mse}, Reg: {reg}, Total: {mse_error}")
+    print(f"Processing : {foldIdx}, Iteration: {iter}, MSE: {mse}, Reg: {reg}, Total: {mse_error}")
 
     # Make sure MSE is valid
     if MSE is not None:
@@ -192,8 +193,8 @@ with open(f"{output}/{num}_best_lambda.txt", "w") as f:
 ################################################################
 
 
-clf = linear_model.Lasso(alpha=lam_norm, fit_intercept=False)
-clf.coef_ = torch.zeros(Edim, Fdim, dtype=torch.float64, device=device)
+clf = linear_model.Lasso(alpha=lam_best_norm, fit_intercept=False)
+clf.coef_ = torch.randn(Edim, Fdim, dtype=torch.float64, device=device)
 # preprocess embeddings and features
 Features_norm, Embeddings_norm, Features_test, Embeddings_test = ProcessFoldData(X = Embeddings, Fe = Features, testId = foldIds[foldIdx])
 
@@ -207,12 +208,14 @@ for iter in range(maxiter):
   Y = torch.mm(Embeddings_norm,Rotation)
   clf.fit(Features_norm.cpu(),Y.cpu())
   
-  mse, reg = MSE(Embeddings_test, Features_test, Rotation, clf, lam_norm)
+  mse, reg = MSE(Embeddings_test, Features_test, Rotation, clf, lam_best_norm)
   mse_error = mse 
   
-  if mse_error - dummymse_error < 0.000001:
+  if mse_error - dummymse_error < 0.000001 and (iter >= 3):  
     break
   dummymse_error = mse_error
+print(f"\n-----Main training step, Iteration: {iter}, MSE: {mse}, Reg: {reg}, Total: {mse_error}-----\n")
+
 
 
 ############################################
