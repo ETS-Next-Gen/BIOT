@@ -10,14 +10,21 @@ def scale(X):
   return (X - np.min(X)) / np.std(X)
 
 
-def ProcessFoldData(X: torch.Tensor, Fe: torch.Tensor, testId: torch.Tensor, CV=False, num=10000000000) -> t.Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def ProcessFoldData(X: torch.Tensor, Fe: torch.Tensor, testId: torch.Tensor, CV=False, num=10000000000, only_standardize=False) -> t.Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     X: embedding matrix (response)
     Fe: external feature matrix (predictors)
     test.id: vector of integers indicating the rows of X and Fe to assign to the test set
     dummy: vector whose elements = T if the corresponding column in Fe is a dummy variable, F otherwise
     """
-
+    if only_standardize:
+      
+      Fe = normalize(Fe, Fe.mean(dim=0, keepdim=True), Fe.std(dim=0, keepdim=True))
+      X = normalize(X, X.mean(dim=0, keepdim=True), 1)
+      
+      return ( Fe, X )
+      
+      
     # Gathering train IDs
     uniques, counts = torch.cat((torch.arange(Fe.shape[0], device="cpu"), testId)).unique(return_counts=True)
     train_id = uniques[counts == 1]
@@ -59,10 +66,11 @@ def MSE(Embeddings, Features, Rotation, clf, lam_norm):
   W = torch.tensor( clf.coef_.T, device=Rotation.device)
   Yp= torch.matmul(Features,W)
   Y = torch.matmul(Embeddings,Rotation)
-  mse = torch.mean((Y - Yp)**2) 
+  mse = torch.mean( torch.mean((Y - Yp)**2 , dim=1) ) / 2
   reg = torch.sum(torch.abs(W))*lam_norm
   
-  return mse.item(), reg.item()
+  return mse.item(), reg.item() 
+
 
 def SVD(Features, W, Embeddings):
   # Creating the decomposed matrix usng Fe, W and X

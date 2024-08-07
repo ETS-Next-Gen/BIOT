@@ -26,9 +26,9 @@ print("--------------------------------")
 nLambdas = 10
 minLambda = 0.0001
 maxLambda = 3.5
-K = 10           # no of folds used for cross validation
+K = 10 # no of folds used for cross validation
 sigThresh = .05   # sigma threshold
-maxiter = 200
+maxiter = 50 # Maximum number of iterations for the training step
 num = 4000 # Number of training samples to use during the cross validation and testing
 # To Randomly sample training data during cross-validation step only
 CV = True
@@ -77,8 +77,6 @@ Edim = Embeddings.shape[1]
 Fdim = Features.shape[1] 
 
 
-
-
 ##############################################
 #### Run BIOT for different lambda values ####
 ##############################################
@@ -92,130 +90,146 @@ print(f"Lambda values: {lambdaVals}")
 # Split data into K folds such that each foldid has the indexes to use
 foldIds = torch.split(torch.randperm(Features.size(0)), Features.size(0) // K)
 
+run_CV = True
+# run_CV = False
+if run_CV:
 
-results = []
-# Perform cross validation for each lambda
-for li, lam in enumerate(lambdaVals):
-  # Normalize lambda
-  lam_norm = lam.item()
-  print('Processing lambda: ', lam_norm, ' at index: ', li)
+  results = []
+  # Perform cross validation for each lambda
+  for li, lam in enumerate(lambdaVals):
+    # Normalize lambda
+    lam_norm = lam.item()
+    print('Processing lambda: ', lam_norm, ' at index: ', li)
 
-  # Cross validation!
-  fold_results = []
-  for foldIdx in range(0, K):
+    # Cross validation!
+    fold_results = []
+    for foldIdx in range(0, K):
 
-    clf = linear_model.Lasso(alpha=lam_norm, fit_intercept=False)
-    clf.coef_ = torch.randn(Edim, Fdim, dtype=torch.float64, device=device)
-    # preprocess embeddings and features
-    Features_norm, Embeddings_norm, Features_test, Embeddings_test = ProcessFoldData(X = Embeddings, Fe = Features, testId = foldIds[foldIdx], CV=CV, num=num)
+      clf = linear_model.Lasso(alpha=lam_norm, fit_intercept=False)
+      clf.coef_ = torch.zeros(Edim, Fdim, dtype=torch.float64, device=device)
+      # preprocess embeddings and features
+      Features_norm, Embeddings_norm, Features_test, Embeddings_test = ProcessFoldData(X = Embeddings, Fe = Features, testId = foldIds[foldIdx], CV=CV, num=num)
 
+      
+      dummymse_error = 0
+      for iter in range(maxiter):
     
-    dummymse_error = 0
-    maxiter = 200
-    for iter in range(maxiter):
-  
-      # Rotation
-      W = torch.tensor( clf.coef_.T, device=Embeddings_norm.device)
-      Rotation = SVD(Features_norm, W, Embeddings_norm)
-      # Lasso regression
-      Y = torch.mm(Embeddings_norm,Rotation)
-      clf.fit(Features_norm.cpu(),Y.cpu())
-      
+        # Rotation
+        W = torch.tensor( clf.coef_.T, device=Embeddings_norm.device)
+        Rotation = SVD(Features_norm, W, Embeddings_norm)
+        
+        # Lasso regression
+        Y = torch.mm(Embeddings_norm,Rotation)
+        clf.fit(Features_norm.cpu(),Y.cpu())
+        
+        mse, reg = MSE(Embeddings_norm, Features_norm, Rotation, clf, lam_norm)
+        mse_error = mse + reg
+        if abs(mse_error - dummymse_error) < 1e-6: 
+          break
+        else: 
+          
+          dummymse_error = mse_error
+    
+      # Testing
       mse, reg = MSE(Embeddings_test, Features_test, Rotation, clf, lam_norm)
-      mse_error = mse 
-      
-      if mse_error - dummymse_error < 0.000001 and (iter >= 3):  
-        break
+      mse_errortest = mse
+      print(f"Processing : {foldIdx}, Iteration: {iter}, MSE: {mse}, Reg: {reg}, Total: {mse_errortest}, mse_error_Train: {mse_error}")
 
-      dummymse_error = mse_error
-    print(f"Processing : {foldIdx}, Iteration: {iter}, MSE: {mse}, Reg: {reg}, Total: {mse_error}")
+      # Make sure MSE is valid
+      if MSE is not None:
+        fold_results.append([lam_norm, mse_error])  
+    # Add output to final results
+    results.append(fold_results)
 
-    # Make sure MSE is valid
-    if MSE is not None:
-      fold_results.append([lam_norm, mse_error])  
-  # Add output to final results
-  results.append(fold_results)
-
-print("\nFinished running BIOT on fold data with different lambda values!")
+  print("\nFinished running BIOT on fold data with different lambda values!")
 
 
 
-####################################
-#### Now choose the best lambda ####
-####################################
+  ####################################
+  #### Now choose the best lambda ####
+  ####################################
 
-print("\nNow calculating the best lambda...")
+  print("\nNow calculating the best lambda...")
 
-# Calculate all of the average MSEs for each lambda across all folds of data
-lam_avg_mse = torch.zeros(len(results), device=device)
-for i, fold_results in enumerate(results):
-  mse = torch.tensor([fold[-1] for fold in fold_results], device=device)
-  fold_avg = mse.mean() # removes the scalar value from the calculated vector ?
-  lam_avg_mse[i] = fold_avg
+  # Calculate all of the average MSEs for each lambda across all folds of data
+  lam_avg_mse = torch.zeros(len(results), device=device)
+  for i, fold_results in enumerate(results):
+    mse = torch.tensor([fold[-1] for fold in fold_results], device=device)
+    fold_avg = mse.mean() # removes the scalar value from the calculated vector ?
+    lam_avg_mse[i] = fold_avg
 
-for i, lam in enumerate(lambdaVals):
-  print(f"Lambda: {lam.item()}, Avg MSE: {lam_avg_mse[i].item()}")
-
-
-# Find the lambda with the smallest average MSE
-lam_best = lam_min_mse_idx = torch.argmin(lam_avg_mse).item()
-lam_min_mse = lambdaVals[lam_min_mse_idx]
-print(f"\nLAMBDA WITH SMALLEST AVG MSE: {lam_min_mse} and mse: {lam_avg_mse[lam_min_mse_idx]}")
+  for i, lam in enumerate(lambdaVals):
+    print(f"Lambda: {lam.item()}, Avg MSE: {lam_avg_mse[i].item()}")
 
 
-mse_min = torch.tensor([fold[1] for fold in results[lam_min_mse_idx]], device=device)
-test_idx = lam_min_mse_idx + 1
-while test_idx < len(results):
-  mse_new = torch.tensor([fold[1] for fold in results[test_idx]], device=device)
+  # Find the lambda with the smallest average MSE
+  lam_best = lam_min_mse_idx = torch.argmin(lam_avg_mse).item()
+  lam_min_mse = lambdaVals[lam_min_mse_idx]
+  print(f"\nLAMBDA WITH SMALLEST AVG MSE: {lam_min_mse} and mse: {lam_avg_mse[lam_min_mse_idx]}")
 
-  if torch.sum(torch.abs(mse_min) - torch.abs(mse_new)) == 0:
-    pval = 1
-  else:
-    pval = wilcoxon(mse_min.cpu().numpy(), mse_new.cpu().numpy(), alternative='two-sided')[1]
 
-  if pval <= sigThresh:
-    lam_best = test_idx - 1
-    break
-  if pval > sigThresh and test_idx + 1 == nLambdas:
-    lam_best = test_idx
-    break
+  mse_min = torch.tensor([fold[1] for fold in results[lam_min_mse_idx]], device=device)
+  test_idx = lam_min_mse_idx + 1
+  while test_idx < len(results):
+    mse_new = torch.tensor([fold[1] for fold in results[test_idx]], device=device)
 
-  test_idx += 1
+    if torch.sum(torch.abs(mse_min) - torch.abs(mse_new)) == 0:
+      pval = 1
+    else:
+      pval = wilcoxon(mse_min.cpu().numpy(), mse_new.cpu().numpy(), alternative='two-sided')[1]
+
+    if pval <= sigThresh:
+      lam_best = test_idx - 1
+      break
+    if pval > sigThresh and test_idx + 1 == nLambdas:
+      lam_best = test_idx
+      break
+
+    test_idx += 1
+
+  lam_best_norm = lambdaVals[lam_best].item()
+  print(f"The most sparse lambda that is not significantly different from the best lambda is {lam_best_norm} at index {lam_best}")
+  with open(f"{output}/{num}_best_lambda.txt", "w") as f:
+    f.write(f"value:-{lam_best_norm}_index:-{lam_best}")
+
+
+  ################################################################
+  #### Now run BIOT with the best lambda on the whole dataset ####
+  ################################################################
 
 lam_best_norm = lambdaVals[lam_best].item()
-print(f"The most sparse lambda that is not significantly different from the best lambda is {lam_best_norm} at index {lam_best}")
-with open(f"{output}/{num}_best_lambda.txt", "w") as f:
-  f.write(f"value:-{lam_best_norm}_index:-{lam_best}")
-
-
-################################################################
-#### Now run BIOT with the best lambda on the whole dataset ####
-################################################################
-
+print(f"The most sparse lambda that is not significantly different from the best lambda is {lam_best_norm} at index 5")
 
 clf = linear_model.Lasso(alpha=lam_best_norm, fit_intercept=False)
-clf.coef_ = torch.randn(Edim, Fdim, dtype=torch.float64, device=device)
+print(clf)
+clf.coef_ = torch.zeros(Edim, Fdim, dtype=torch.float64, device=device)
 # preprocess embeddings and features
-Features_norm, Embeddings_norm, Features_test, Embeddings_test = ProcessFoldData(X = Embeddings, Fe = Features, testId = foldIds[foldIdx])
-
+Features_norm, Embeddings_norm = ProcessFoldData(X = Embeddings, Fe = Features, testId = foldIds[0], only_standardize=True)
+# Features_norm, Embeddings_norm, _, _ = ProcessFoldData(X = Embeddings, Fe = Features, testId = foldIds[0], CV=CV, num=4000) #, only_standardize=True)
+print(f"Features_norm: {Features_norm.shape}, Embeddings_norm: {Embeddings_norm.shape}")
 
 dummymse_error = 0
+maxiter = 500
 for iter in range(maxiter):
+  
   # Rotation
   W = torch.tensor( clf.coef_.T, device=Embeddings_norm.device)
   Rotation = SVD(Features_norm, W, Embeddings_norm)
+  
   # Lasso regression
   Y = torch.mm(Embeddings_norm,Rotation)
   clf.fit(Features_norm.cpu(),Y.cpu())
   
-  mse, reg = MSE(Embeddings_test, Features_test, Rotation, clf, lam_best_norm)
-  mse_error = mse 
-  
-  if mse_error - dummymse_error < 0.000001 and (iter >= 3):  
+  mse, reg = MSE(Embeddings_norm, Features_norm, Rotation, clf, lam_best_norm)
+  mse_error = mse + reg
+  print(f"Iter : {iter}, MSE: {mse}, Reg: {reg}, Total: {mse_error}")
+        
+  if abs(mse_error - dummymse_error) < 1e-7 : 
     break
-  dummymse_error = mse_error
+  else: 
+    dummymse_error = mse_error
+  
 print(f"\n-----Main training step, Iteration: {iter}, MSE: {mse}, Reg: {reg}, Total: {mse_error}-----\n")
-
 
 
 ############################################
