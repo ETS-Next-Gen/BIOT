@@ -55,9 +55,7 @@ def ProcessFoldData(X: torch.Tensor, Fe: torch.Tensor, testId: torch.Tensor, CV=
       count = torch.randperm(Fe_train.shape[0])[:count] # Get me num random samples from the training set 
       Fe_train = Fe_train[count,:]
       X_train = X_train[count,:]
-      
-      # Fe_test = Fe_test[:count,:]
-      # X_test = X_test[:count,:]
+
       
     return ( Fe_train, X_train, Fe_test, X_test ) 
 

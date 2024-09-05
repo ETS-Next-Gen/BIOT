@@ -34,9 +34,9 @@ minLambda = 0.0001
 maxLambda = 3.5
 K = 10 # no of folds used for cross validation
 sigThresh = .05   # sigma threshold
-maxiter = 50 # Maximum number of iterations for the training step
+maxiter = 100 # Maximum number of iterations for the training step
 num = 1000 # Number of training samples to use during the cross validation and testing
-CV = True # To Randomly sample training data during cross-validation step only
+CV = True # To Randomly sample {num} training data during cross-validation step only
 # CV =  False 
 
 
@@ -139,7 +139,6 @@ if run_CV:
         if abs(mse_error - dummymse_error) < 1e-6: 
           break
         else: 
-          
           dummymse_error = mse_error
     
       # Testing
@@ -154,7 +153,6 @@ if run_CV:
     results.append(fold_results)
 
   print("\nFinished running BIOT on fold data with different lambda values!")
-
 
 
   ####################################
