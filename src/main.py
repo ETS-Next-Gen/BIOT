@@ -8,33 +8,39 @@ from scipy.stats import wilcoxon
 import warnings 
 warnings.filterwarnings("ignore")
 
-# DEFAULT FILE PATHS
+
+
+
+############################################
+#### DEFAULT FILE PATHS ####
+############################################
 datasets = "../datasets/"
 output = "../output/"
 #datasets = "../datasets/layers10_big"
 try: os.mkdir(output)
 except: pass
 
-print("Default file paths:-------------")
+print("\nDefault file paths:-------------")
 print(f"datasets: {datasets}")
 print(f"output: {output}")
-print("--------------------------------")
+print("--------------------------------\n")
 
 
-
-# DEFAULT PARAMETERS
+############################################
+#### BIOT HYPERPARAMETERS ####
+############################################
 nLambdas = 10
 minLambda = 0.0001
 maxLambda = 3.5
 K = 10 # no of folds used for cross validation
 sigThresh = .05   # sigma threshold
 maxiter = 50 # Maximum number of iterations for the training step
-num = 4000 # Number of training samples to use during the cross validation and testing
-# To Randomly sample training data during cross-validation step only
-CV = True
+num = 1000 # Number of training samples to use during the cross validation and testing
+CV = True # To Randomly sample training data during cross-validation step only
 # CV =  False 
 
-print("Default parameters:-------------")
+
+print("\nDefault parameters:-------------")
 print(f"nLambdas: {nLambdas}")
 print(f"minLambda: {minLambda}")
 print(f"maxLambda: {maxLambda}")
@@ -43,32 +49,40 @@ print(f"sigThresh: {sigThresh}")
 print(f"maxiter: {maxiter}")
 print(f"num of training samples for CV: {num}")
 print(f"Randomly sample training data during cross-validation: {CV}")
-print("--------------------------------")
+print("--------------------------------\n")
 
 
+print(f" \
+      Do not use cross validation if the dataset is large enough, 
+      Simply train the model for different values of lambda and pick the one which gives you similar MSE error and higher 
+      regualrizaiton.
+      Use the value of K as 1. \n \
+      ")
 
-# PYTORCH ENVIRONMENT VARIABLES
+
+############################################
+#### PYTORCH ENVIRONMENT VARIABLES SETUP ####
+############################################
 device = torch.device("cuda")
 # device = torch.device("cpu")
-
-print(f"Device: {device}")
-
+print(f"\nDevice: {device}\n")
 
 
-# DATASET PARAMETERS FOR RANDOM DATA
-Bsz = 100
-Edim = 384
-Fdim = 21
 
-# Loading from a file
-file = True
+############################################
+#### LOAD DATA FROM FILE OR RANDOM DATA ####
+############################################
+file = True 
 if file:
-  
-  
   Embeddings = torch.tensor(np.genfromtxt(f"{datasets}/embeddings.csv", delimiter=',', dtype='float64'), device=device)
   Features =  torch.tensor(np.genfromtxt(f"{datasets}/features.csv", delimiter=',', skip_header=1, dtype='float64'), device=device)
-
 else:
+  # DATASET PARAMETERS FOR RANDOM DATA
+  Bsz = 100
+  Edim = 384
+  Fdim = 21
+  # Loading from a file
+
   Embeddings = torch.rand(Bsz,Edim).to(torch.float64).to(device)
   Features = torch.rand(Bsz,Fdim).to(torch.float64).to(device)
 
@@ -90,8 +104,11 @@ print(f"Lambda values: {lambdaVals}")
 # Split data into K folds such that each foldid has the indexes to use
 foldIds = torch.split(torch.randperm(Features.size(0)), Features.size(0) // K)
 
+
 run_CV = True
-# run_CV = False
+if num > 4000:
+  run_CV = False
+
 if run_CV:
 
   results = []
@@ -160,6 +177,7 @@ if run_CV:
 
   for i, lam in enumerate(lambdaVals):
     print(f"Lambda: {lam.item()}, Avg MSE: {lam_avg_mse[i].item()}")
+  print("Use this info and what is recommended by the algorithm to choose the best lambda")
 
 
   # Find the lambda with the smallest average MSE
@@ -193,9 +211,9 @@ if run_CV:
     f.write(f"value:-{lam_best_norm}_index:-{lam_best}")
 
 
-  ################################################################
-  #### Now run BIOT with the best lambda on the whole dataset ####
-  ################################################################
+################################################################
+#### Now run BIOT with the best lambda on the whole dataset ####
+################################################################
 
 lam_best_norm = lambdaVals[lam_best].item()
 print(f"The most sparse lambda that is not significantly different from the best lambda is {lam_best_norm} at index 5")
@@ -205,7 +223,6 @@ print(clf)
 clf.coef_ = torch.zeros(Edim, Fdim, dtype=torch.float64, device=device)
 # preprocess embeddings and features
 Features_norm, Embeddings_norm = ProcessFoldData(X = Embeddings, Fe = Features, testId = foldIds[0], only_standardize=True)
-# Features_norm, Embeddings_norm, _, _ = ProcessFoldData(X = Embeddings, Fe = Features, testId = foldIds[0], CV=CV, num=4000) #, only_standardize=True)
 print(f"Features_norm: {Features_norm.shape}, Embeddings_norm: {Embeddings_norm.shape}")
 
 dummymse_error = 0
