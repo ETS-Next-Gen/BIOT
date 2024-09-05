@@ -9,9 +9,9 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # DEFAULT FILE PATHS
-# datasets = "../datasets/"
+datasets = "../datasets/"
 output = "../output/"
-datasets = "../datasets/layers10_big"
+#datasets = "../datasets/layers10_big"
 try: os.mkdir(output)
 except: pass
 
