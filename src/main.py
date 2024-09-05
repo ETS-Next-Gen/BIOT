@@ -52,12 +52,7 @@ print(f"Randomly sample training data during cross-validation: {CV}")
 print("--------------------------------\n")
 
 
-print(f" \
-      Do not use cross validation if the dataset is large enough, 
-      Simply train the model for different values of lambda and pick the one which gives you similar MSE error and higher 
-      regualrizaiton.
-      Use the value of K as 1. \n \
-      ")
+print(f" Do not use cross validation if the dataset is large enough, Simply train the model for different values of lambda and pick the one which gives you similar MSE error and higher regualrizaiton. Use the value of K as 1.")
 
 
 ############################################
