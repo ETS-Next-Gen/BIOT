@@ -1,7 +1,7 @@
 import torch
 
     
-@torch.jit.script
+#@torch.jit.script
 class TorchL1:
     def __init__(self, alpha=1.0, max_iter=1000, tol=1e-6):
         self.alpha = alpha
@@ -28,11 +28,11 @@ class TorchL1:
         self.alpha *= X.shape[0]        
         
         # Coordinate descent for L1 regularization
-        self.W = self._coordinate_descent(X, y)
+        self.coef_ = self._coordinate_descent(X, y, self.alpha, self.coef_)
 
         return self
 
-    def _coordinate_descent(self, X, Y):
+    def _coordinate_descent(self, X, Y, lam, W, max_iter = 1000, tol = 1e-10):
         """
         Lasso coordinate descent algorithm.
         
@@ -56,29 +56,34 @@ class TorchL1:
         W : torch.Tensor
             Updated weights.
         """
+  
         _, a = X.shape
         _, b = Y.shape
-        summation_ = torch.sum(X ** 2, dim=0)  # (a,)
+        # W shape = (a, b)
         
-        W = self.coef_
-
-        for _ in range(self.max_iter):
+        summation_ = torch.sum(X ** 2, dim=0) # shape = (a,)
+        
+        for _ in range(max_iter):
             W_old = W.clone()
-
+            
             for k in range(a):
+                
                 if summation_[k] == 0:
-                    continue
-
-                residual = Y - torch.matmul(X, W) + torch.matmul(X[:, k].unsqueeze(-1), W[k, :].unsqueeze(0))  # (n, b)
-                rho = torch.mv(residual.T, X[:, k]).unsqueeze(-1)  # (b, 1)
-                W[k, :] = (torch.sign(rho) * torch.maximum(torch.abs(rho) - lam, torch.zeros_like(rho))).squeeze() / summation_[k]
-
-            # Stopping criteria
-            if torch.max(torch.abs(W - W_old)) < self.tol * torch.max(torch.abs(W)):
+                    continue  
+                
+                residual = Y - torch.matmul(X, W) + torch.matmul(X[:, k].unsqueeze(-1), W[k, :].unsqueeze(0)) # shape = (n, b)
+                    
+                rho = torch.mv(residual.T, X[:, k]).unsqueeze(-1) # shape = (b,1)
+                W[k,:] = (torch.sign(rho) * torch.maximum( torch.abs(rho) - lam, torch.zeros_like(rho)) ).squeeze() / summation_[k]
+                
+            # stopping criteria
+            if ( torch.max(torch.abs(W - W_old)) < tol * torch.max(torch.abs(W)) ):
+                # 
                 break
+            
+        return W
 
-        self.coef_ = W
-        
+
     def predict(self, X):
         """
         Predict using the linear model.

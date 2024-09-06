@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore")
 # DEFAULT FILE PATHS
 datasets = "../datasets/"
 output = "../output/"
-datasets = "../datasets/layers10_big"
+
 try: os.mkdir(output)
 except: pass
 
@@ -143,6 +143,8 @@ for  val, alpha in enumerate(lambdaVals):
         
         # Lasso regression
         Y = torch.matmul(Embeddings_norm,Rotation)
+        print(Features_norm.shape, Y.shape, W.shape)
+        exit()
         W = lasso_coordinate_descent(Features_norm, Y, alpha, W)
 
         mse, reg = MSE(Embeddings_norm, Features_norm, Rotation, W,  alpha / Embeddings_norm.size(0))

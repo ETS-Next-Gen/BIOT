@@ -100,6 +100,7 @@ foldIds = torch.split(torch.randperm(Features.size(0)), Features.size(0) // K)
 
 
 run_CV = True
+run_CV = False
 if num > 4000:
   run_CV = False
 
@@ -115,22 +116,26 @@ if run_CV:
     # Cross validation!
     fold_results = []
     for foldIdx in range(0, K):
-
+      
       clf = TorchL1(alpha=lam_norm, max_iter=maxiter, tol=1e-6)
-      clf.coef_ = torch.zeros(Edim, Fdim, dtype=torch.float64, device=device)
+      clf.coef_ = torch.zeros(Edim, Fdim).to(torch.float32).to(device)
+      
       # preprocess embeddings and features
       Features_norm, Embeddings_norm, Features_test, Embeddings_test = ProcessFoldData(X = Embeddings, Fe = Features, testId = foldIds[foldIdx], CV=CV, num=num)
+      
 
       
       dummymse_error = 0
+      W = clf.coef_.T
       for iter in range(maxiter):
     
         # Rotation
-        W = torch.tensor( clf.coef_.T, device=Embeddings_norm.device)
         Rotation = SVD(Features_norm, W, Embeddings_norm)
         
         # Lasso regression
         Y = torch.mm(Embeddings_norm,Rotation)
+        # print(Features_norm.shape, Y.shape, W.shape)
+        # exit()
         clf.fit(Features_norm,Y)
         
         mse, reg = MSE(Embeddings_norm, Features_norm, Rotation, clf, lam_norm)
