@@ -52,8 +52,6 @@ print(f"Randomly sample training data during cross-validation: {CV}")
 print("--------------------------------\n")
 
 
-print(f" Do not use cross validation if the dataset is large enough, Simply train the model for different values of lambda and pick the one which gives you similar MSE error and higher regualrizaiton. Use the value of K as 1.")
-
 
 ############################################
 #### PYTORCH ENVIRONMENT VARIABLES SETUP ####
@@ -101,8 +99,8 @@ foldIds = torch.split(torch.randperm(Features.size(0)), Features.size(0) // K)
 
 
 run_CV = True
-if num > 4000:
-  run_CV = False
+# run_CV = False
+print(f" Do not use cross validation if the dataset is large enough, Simply train the model for different values of lambda and pick the one which gives you similar MSE error and higher regualrizaiton. Set run_CV as False.")
 
 if run_CV:
 
