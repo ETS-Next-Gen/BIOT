@@ -1,3 +1,5 @@
+The original R code for BIOT can be found at https://github.com/rebeccamarion/BIOT
+
 ### gpu
 This folder contains the code that runs completely on GPUs.
 
