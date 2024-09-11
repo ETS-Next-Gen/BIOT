@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore")
 ############################################
 datasets = "../datasets/"
 output = "../output/"
-#datasets = "../datasets/layers10_big"
+# datasets = "../datasets/layers10_big"
 try: os.mkdir(output)
 except: pass
 
@@ -100,10 +100,7 @@ foldIds = torch.split(torch.randperm(Features.size(0)), Features.size(0) // K)
 
 
 run_CV = True
-run_CV = False
-if num > 4000:
-  run_CV = False
-
+# run_CV = False
 if run_CV:
 
   results = []
@@ -118,32 +115,30 @@ if run_CV:
     for foldIdx in range(0, K):
       
       clf = TorchL1(alpha=lam_norm, max_iter=maxiter, tol=1e-6)
-      clf.coef_ = torch.zeros(Edim, Fdim).to(torch.float32).to(device)
-      
+          
       # preprocess embeddings and features
       Features_norm, Embeddings_norm, Features_test, Embeddings_test = ProcessFoldData(X = Embeddings, Fe = Features, testId = foldIds[foldIdx], CV=CV, num=num)
       
-
+      clf.coef_ = torch.zeros(Edim, Fdim).to(torch.float32).to(device).T
+      clf.alpha *= Features_norm.size(0)
       
       dummymse_error = 0
-      W = clf.coef_.T
       for iter in range(maxiter):
     
         # Rotation
-        Rotation = SVD(Features_norm, W, Embeddings_norm)
+        Rotation = SVD(Features_norm, clf.coef_, Embeddings_norm)
         
         # Lasso regression
         Y = torch.mm(Embeddings_norm,Rotation)
-        # print(Features_norm.shape, Y.shape, W.shape)
-        # exit()
         clf.fit(Features_norm,Y)
         
         mse, reg = MSE(Embeddings_norm, Features_norm, Rotation, clf, lam_norm)
         mse_error = mse + reg
-        if abs(mse_error - dummymse_error) < 1e-6: 
+        if abs(mse_error - dummymse_error) < 1e-2: 
           break
         else: 
           dummymse_error = mse_error
+        
     
       # Testing
       mse, reg = MSE(Embeddings_test, Features_test, Rotation, clf, lam_norm)
@@ -212,33 +207,36 @@ if run_CV:
 #### Now run BIOT with the best lambda on the whole dataset ####
 ################################################################
 
+# lam_best = 5
 lam_best_norm = lambdaVals[lam_best].item()
 print(f"The most sparse lambda that is not significantly different from the best lambda is {lam_best_norm} at index 5")
 
-clf = linear_model.Lasso(alpha=lam_best_norm, fit_intercept=False)
-print(clf)
-clf.coef_ = torch.zeros(Edim, Fdim, dtype=torch.float64, device=device)
+clf = TorchL1(alpha=lam_best_norm, max_iter=maxiter, tol=1e-6)
+
 # preprocess embeddings and features
 Features_norm, Embeddings_norm = ProcessFoldData(X = Embeddings, Fe = Features, testId = foldIds[0], only_standardize=True)
 print(f"Features_norm: {Features_norm.shape}, Embeddings_norm: {Embeddings_norm.shape}")
 
 dummymse_error = 0
 maxiter = 500
+
+clf.coef_ = torch.zeros(Edim, Fdim).to(torch.float32).to(device).T
+clf.alpha *= Features_norm.size(0)
+
 for iter in range(maxiter):
   
   # Rotation
-  W = torch.tensor( clf.coef_.T, device=Embeddings_norm.device)
-  Rotation = SVD(Features_norm, W, Embeddings_norm)
+  Rotation = SVD(Features_norm, clf.coef_, Embeddings_norm)
   
   # Lasso regression
   Y = torch.mm(Embeddings_norm,Rotation)
-  clf.fit(Features_norm.cpu(),Y.cpu())
+  clf.fit(Features_norm,Y)
   
   mse, reg = MSE(Embeddings_norm, Features_norm, Rotation, clf, lam_best_norm)
   mse_error = mse + reg
   print(f"Iter : {iter}, MSE: {mse}, Reg: {reg}, Total: {mse_error}")
         
-  if abs(mse_error - dummymse_error) < 1e-7 : 
+  if abs(mse_error - dummymse_error) < 1e-6 : 
     break
   else: 
     dummymse_error = mse_error
@@ -249,7 +247,7 @@ print(f"\n-----Main training step, Iteration: {iter}, MSE: {mse}, Reg: {reg}, To
 ############################################
 #### Now Save the results to a CSV file ####
 ############################################
-W = clf.coef_.T
+W = clf.coef_.cpu().numpy()
 Rotation = Rotation.cpu().numpy()
 print(W, W.max(), W.min())
 print(Rotation, Rotation.max(), Rotation.min())

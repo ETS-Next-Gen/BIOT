@@ -7,7 +7,7 @@ class TorchL1:
         self.alpha = alpha
         self.max_iter = max_iter
         self.tol = tol
-        self.coef_ = None
+        self.coef_ = None      
 
     def fit(self, X, y):
         """
@@ -25,12 +25,9 @@ class TorchL1:
         self : object
             Fitted estimator.
         """
-        self.alpha *= X.shape[0]        
         
-        # Coordinate descent for L1 regularization
-        self.coef_ = self._coordinate_descent(X, y, self.alpha, self.coef_)
-
-        return self
+        # Coordinate descent for L1 regularization 
+        self._coordinate_descent(X, y, self.alpha, self.coef_)
 
     def _coordinate_descent(self, X, Y, lam, W, max_iter = 1000, tol = 1e-10):
         """
@@ -80,8 +77,8 @@ class TorchL1:
             if ( torch.max(torch.abs(W - W_old)) < tol * torch.max(torch.abs(W)) ):
                 # 
                 break
-            
-        return W
+                
+        self.coef_ = W
 
 
     def predict(self, X):
